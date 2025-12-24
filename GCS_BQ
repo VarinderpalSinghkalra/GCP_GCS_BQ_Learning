@@ -1,0 +1,207 @@
+📘 Spend Cube CSV → BigQuery
+Real-World Data Engineering Learnings (With Commands)
+
+This project documents the complete, real-world process of ingesting a large enterprise Spend Cube CSV into Google BigQuery, handling schema, naming, duplication, and data-format issues.
+
+📂 Dataset Details
+
+Source: Vendor Spend Cube CSV
+
+Rows: ~700
+
+Columns: 400+
+
+Issues Present:
+
+Invalid column names
+
+Duplicate columns
+
+Mixed date formats
+
+Inconsistent schema inference
+
+1️⃣ Upload Raw CSV to Google Cloud Storage
+gsutil cp "Spend Cube 2025-10-30 17_56 (1).csv" gs://datavip/spend_cube_raw.csv
+
+
+✅ Raw file stored safely
+📌 No assumptions made about schema
+
+2️⃣ Problem: BigQuery Does NOT Accept Raw CSV Headers
+Issues found:
+
+Spaces in column names
+
+Parentheses ( )
+
+Dots .
+
+Hyphens -
+
+Duplicate logical columns
+
+Example invalid headers:
+
+Business unit L1 (Contracts)
+Exiobase_3.8.2_USD_Ignite_v1.1_Emission_Factors-relation
+Payment Terms
+Payment-Terms
+
+
+📌 BigQuery requires:
+Only [a-zA-Z0-9_] and unique column names
+
+3️⃣ Fix Column Names + Resolve Duplicates (Python)
+✔ Fully sanitize header
+✔ Force case-insensitive uniqueness
+python3 - << 'EOF'
+import csv
+import re
+from collections import defaultdict
+
+INPUT = "spend_cube_raw.csv"
+OUTPUT = "spend_cube_clean.csv"
+
+def normalize(col):
+    col = col.strip().lower()
+    col = re.sub(r"[^\w]", "_", col)
+    col = re.sub(r"_+", "_", col)
+    return col.strip("_")
+
+with open(INPUT, newline='', encoding='utf-8') as f:
+    reader = csv.reader(f)
+    header = next(reader)
+    rows = list(reader)
+
+seen = defaultdict(int)
+final_header = []
+
+for col in header:
+    base = normalize(col)
+    name = base if seen[base] == 0 else f"{base}_{seen[base]}"
+    final_header.append(name)
+    seen[base] += 1
+
+with open(OUTPUT, "w", newline='', encoding='utf-8') as f:
+    writer = csv.writer(f)
+    writer.writerow(final_header)
+    writer.writerows(rows)
+
+print("✅ CSV header cleaned and made BigQuery-safe")
+EOF
+
+Result:
+payment_terms
+payment_terms_1
+transaction_date
+transaction_date_1
+
+
+📌 Key Learning:
+Duplicate resolution must happen before ingestion, not during.
+
+4️⃣ Upload Clean CSV Back to GCS
+gsutil cp spend_cube_clean.csv gs://datavip/spend_cube_clean.csv
+
+5️⃣ Problem: Timestamp Parsing Failures
+Error encountered:
+Could not parse '21-08-2024 00:00' as a timestamp
+
+
+BigQuery only accepts:
+
+YYYY-MM-DD HH:MM:SS
+
+
+CSV contained:
+
+DD-MM-YYYY HH:MM
+
+
+📌 Autodetect inferred TIMESTAMP and failed.
+
+6️⃣ Enterprise Solution: RAW STRING Staging Table
+Why?
+
+Mixed date formats
+
+Inconsistent vendor data
+
+Prevent load failures
+
+📌 Industry pattern:
+
+RAW (STRING) → CURATED (Typed)
+
+7️⃣ Create BigQuery Table (ALL STRING COLUMNS)
+bq mk \
+  --table \
+  data-engineering-479617:conversational_demo.sample_spenddata \
+  $(python3 - << 'EOF'
+import csv
+with open("spend_cube_clean.csv") as f:
+    header = next(csv.reader(f))
+print(",".join([f"{c}:STRING" for c in header]))
+EOF
+)
+
+
+✅ Table created
+✅ No type inference
+✅ Schema fully stable
+
+8️⃣ Load CSV WITHOUT Autodetect (Guaranteed Success)
+bq load \
+  --source_format=CSV \
+  --skip_leading_rows=1 \
+  --allow_quoted_newlines \
+  data-engineering-479617:conversational_demo.sample_spenddata \
+  gs://datavip/spend_cube_clean.csv
+
+
+✅ Load succeeds
+✅ No timestamp errors
+✅ No schema conflicts
+
+9️⃣ Verify Load
+SELECT COUNT(*)
+FROM `data-engineering-479617.conversational_demo.sample_spenddata`;
+
+SELECT column_name, data_type
+FROM `data-engineering-479617.conversational_demo.INFORMATION_SCHEMA.COLUMNS`
+WHERE table_name = 'sample_spenddata';
+
+🔄 10️⃣ Convert Dates Safely (Curated Layer)
+SELECT
+  SAFE.PARSE_TIMESTAMP('%d-%m-%Y %H:%M', documentdate_60) AS document_ts
+FROM `data-engineering-479617.conversational_demo.sample_spenddata`;
+
+
+📌 SAFE functions prevent query failures on bad rows.
+
+🧠 Key Learnings (Interview-Ready)
+
+BigQuery is schema-strict
+
+Autodetect fails with inconsistent data
+
+CSV ingestion requires pre-processing
+
+RAW tables should use STRING columns
+
+Type conversion belongs in curated layers
+
+Debugging ingestion issues is core data engineering work
+
+🛠 Tools Used
+
+Google Cloud Storage
+
+BigQuery
+
+bq CLI
+
+Python (CSV processing)
+
+SQL (SAFE.PARSE_TIMESTAMP)
