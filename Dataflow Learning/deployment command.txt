@@ -1,0 +1,7 @@
+python main.py \
+  --runner DataflowRunner \
+  --project data-engineering-479617 \
+  --region us-central1 \
+  --temp_location gs://datavip/temp \
+  --staging_location gs://datavip/staging \
+  --service_account_email sql-bot-sa@data-engineering-479617.iam.gserviceaccount.com

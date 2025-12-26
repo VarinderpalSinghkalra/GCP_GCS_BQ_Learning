@@ -1,0 +1,159 @@
+========================================
+Google Cloud Dataflow – Learnings & Notes
+========================================
+
+Project Context:
+----------------
+Implemented a Dataflow batch pipeline to load a CSV file from Google Cloud Storage
+into BigQuery. The CSV contained multiple columns with potential schema variations
+and dirty data.
+
+Service Used:
+-------------
+Google Cloud Dataflow (Apache Beam based)
+
+----------------------------------------
+1. Core Understanding of Dataflow
+----------------------------------------
+
+- Dataflow is a fully managed service for batch and streaming data processing.
+- Pipelines are written using Apache Beam (Python / Java).
+- Dataflow abstracts infrastructure, scaling, retries, and fault tolerance.
+- Dataflow supports both batch and streaming in the same programming model.
+
+----------------------------------------
+2. GCS → BigQuery CSV Ingestion
+----------------------------------------
+
+Initial Goal:
+- Load complete CSV data from GCS into BigQuery using Dataflow.
+
+Challenges Faced:
+- BigQuery table not found errors
+- Schema required when auto-creating tables
+- JSON load failures during batch loads
+- Header rows being ingested as data
+- CSV rows with variable column counts
+- Strict BigQuery batch load behavior (1 bad row fails job)
+
+----------------------------------------
+3. Important BigQuery + Dataflow Rules
+----------------------------------------
+
+- When using WRITE_TO_BIGQUERY with batch loads:
+  - BigQuery requires a schema.
+  - Schema must exactly match incoming data.
+  - One malformed record causes the entire job to fail.
+
+- CREATE_IF_NEEDED requires schema to be explicitly provided.
+- Dynamic dictionaries alone are NOT enough for batch loads.
+- Header rows must be handled explicitly.
+- Unknown or extra columns cause JSON load failures.
+
+----------------------------------------
+4. RAW Layer Design Best Practices
+----------------------------------------
+
+- Always ingest RAW data as STRING columns.
+- Do not apply transformations during ingestion.
+- Handle schema evolution at RAW layer by keeping data flexible.
+- Use CURATED layer for type casting and validations.
+
+----------------------------------------
+5. Why Batch Loads Failed
+----------------------------------------
+
+- Dataflow batch writes use BigQuery LOAD jobs internally.
+- LOAD jobs are strict:
+  - No ignoreUnknownValues
+  - No partial success
+  - No dirty row tolerance
+- CSV with inconsistent rows or quotes causes JSON load errors.
+
+----------------------------------------
+6. Final Working Strategy (Production Safe)
+----------------------------------------
+
+Chosen Approach:
+- Dynamic CSV ingestion
+- All columns loaded as STRING
+- BigQuery table created before pipeline execution
+- Dataflow used only for ingestion
+- Streaming inserts used instead of batch loads
+
+Why Streaming Inserts:
+- Tolerates dirty data
+- No JSON temp files
+- No load job strictness
+- Does not fail entire job due to one bad row
+
+----------------------------------------
+7. Final Architecture
+----------------------------------------
+
+GCS (CSV File)
+   ↓
+Dataflow (Apache Beam)
+   - Read CSV
+   - Parse rows dynamically
+   - Skip header safely
+   - Map rows to dictionary
+   ↓
+BigQuery RAW Table (All STRING columns)
+
+----------------------------------------
+8. Table Management Strategy
+----------------------------------------
+
+- Pre-flight BigQuery step:
+  - Check if dataset exists
+  - Delete table if exists
+  - Create fresh table using CSV header
+- Prevents schema drift and runtime failures
+- Avoids race conditions inside Dataflow workers
+
+----------------------------------------
+9. Deployment Learnings
+----------------------------------------
+
+- DataflowRunner must be used for cloud execution.
+- temp_location and staging_location must exist in GCS.
+- Service account must have:
+  - roles/dataflow.admin
+  - roles/dataflow.worker
+  - roles/bigquery.dataEditor
+  - roles/storage.objectViewer
+
+----------------------------------------
+10. Common Mistakes to Avoid
+----------------------------------------
+
+- Deleting or creating BigQuery tables inside Dataflow transforms
+- Using batch loads for dirty CSV ingestion
+- Hardcoding column names
+- Relying on autodetect in production
+- Skipping header using string comparison
+- Mixing ingestion and transformation logic
+
+----------------------------------------
+11. Interview-Ready Summary
+----------------------------------------
+
+"I implemented a Dataflow pipeline to dynamically ingest CSV data from GCS into
+BigQuery. I handled schema variability by loading all fields as STRING into a RAW
+layer, used streaming inserts to avoid batch load strictness, and managed table
+creation outside the pipeline for reliability and schema governance."
+
+----------------------------------------
+12. Next Enhancements (Planned)
+----------------------------------------
+
+- RAW → CURATED Dataflow pipeline
+- Type casting and data validation
+- Dead-letter GCS bucket for bad records
+- Partitioning and clustering in BigQuery
+- Beam SQL for curated transformations
+
+========================================
+End of Notes
+========================================
