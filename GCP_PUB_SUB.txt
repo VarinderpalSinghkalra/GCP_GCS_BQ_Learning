@@ -1,0 +1,132 @@
+TITLE: Basic Google Cloud Pub/Sub – Hands-on Learning Notes
+
+PROJECT DETAILS
+----------------
+Project ID     : data-engineering-479617
+Topic Name     : my-learning
+Subscription   : my-first-sub
+
+OBJECTIVE
+---------
+To understand and implement a basic Google Cloud Pub/Sub workflow where
+a publisher sends messages to a topic and a subscriber consumes them
+through a subscription.
+
+This setup demonstrates asynchronous, decoupled communication
+between services.
+
+ARCHITECTURE OVERVIEW
+---------------------
+Publisher → Pub/Sub Topic → Subscription → Subscriber
+
+Publishers and subscribers are independent and do not directly
+communicate with each other.
+
+STEP 1: Set Active GCP Project
+------------------------------
+Command:
+gcloud config set project data-engineering-479617
+
+Purpose:
+Ensures all Pub/Sub resources are created in the correct GCP project.
+
+STEP 2: Create Pub/Sub Topic
+----------------------------
+Command:
+gcloud pubsub topics create my-learning
+
+Purpose:
+Creates a topic that acts as a message ingestion point.
+All publishers send messages to this topic.
+
+STEP 3: Create Subscription
+---------------------------
+Command:
+gcloud pubsub subscriptions create my-first-sub \
+  --topic=my-learning
+
+Purpose:
+Creates a pull-based subscription linked to the topic.
+Subscribers pull messages from this subscription.
+
+STEP 4: Publish Message to Topic
+--------------------------------
+Command:
+gcloud pubsub topics publish my-learning \
+  --message="Hello from data-engineering-479617"
+
+Purpose:
+Publishes a message into the topic.
+The message is automatically delivered to all attached subscriptions.
+
+STEP 5: Pull Messages from Subscription
+---------------------------------------
+Command:
+gcloud pubsub subscriptions pull my-first-sub \
+  --auto-ack
+
+Purpose:
+Reads messages from the subscription.
+--auto-ack ensures messages are acknowledged immediately
+to avoid re-delivery.
+
+Message data is returned in Base64 format.
+
+IAM REQUIREMENTS
+----------------
+Required roles for service accounts or users:
+- roles/pubsub.publisher
+- roles/pubsub.subscriber
+
+Example command:
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:<SERVICE_ACCOUNT_EMAIL>" \
+  --role="roles/pubsub.publisher"
+
+PYTHON PUBLISHER (OPTIONAL)
+---------------------------
+Used when applications publish messages programmatically.
+
+Key steps:
+- Initialize PublisherClient
+- Build topic path
+- Publish byte-encoded message
+
+PYTHON SUBSCRIBER (OPTIONAL)
+----------------------------
+Used for real-time message consumption.
+
+Key steps:
+- Initialize SubscriberClient
+- Build subscription path
+- Define callback function
+- Acknowledge messages after processing
+
+REAL-WORLD USE CASES
+--------------------
+- Event-driven microservices
+- Streaming ingestion pipelines
+- Triggering Dataflow jobs
+- API decoupling
+- Real-time analytics
+- Log and event processing
+
+COMMON MISTAKES
+---------------
+- Missing IAM permissions
+- Pulling messages without acknowledgment
+- Using wrong project ID
+- Subscription not attached to correct topic
+
+KEY LEARNINGS
+-------------
+- Understood Pub/Sub core components: Topic and Subscription
+- Implemented message publishing and consumption
+- Learned pull-based subscriber model
+- Practiced CLI-based Pub/Sub operations
+- Understood asynchronous messaging pattern
+
+STATUS
+------
+Basic Pub/Sub implementation successfully completed.
+Ready to integrate with Dataflow, Cloud Functions, or BigQuery.
