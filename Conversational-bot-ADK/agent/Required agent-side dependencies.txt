@@ -1,0 +1,3 @@
+Run this :- pip install --upgrade google-cloud-aiplatform pyyaml
+
+Quick Check :- python3 -c "import yaml, vertexai; print('OK')"
