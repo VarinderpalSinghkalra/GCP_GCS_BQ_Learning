@@ -1,0 +1,27 @@
+User :- I cannot log in to the workflow tool
+
+ADK (internally) :- 
+{
+  "reporter_id": "user",
+  "issue": "I cannot log in to the workflow tool",
+  "priority": "P1"
+}
+
+Tool Response :-
+{
+  "issue_id": "INC-4F91A2BC",
+  "status": "created",
+  "assistant_reply": "Please try resetting your password..."
+}
+
+
+Final User Reply :- 
+
+Your issue has been logged successfully.
+
+Ticket ID: INC-4F91A2BC
+Priority: P1 (Critical)
+
+Next steps:
+- Our support team is investigating
+- You will receive updates shortly
