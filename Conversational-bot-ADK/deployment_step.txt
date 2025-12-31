@@ -1,0 +1,228 @@
+ISSUE MANAGEMENT BACKEND + ADK AGENT – DEPLOYMENT NOTES
+======================================================
+
+Project:
+--------
+Platform Support Analyst – Issue Management System
+
+Components:
+-----------
+1) Backend Tool (Cloud Function / Cloud Run)
+2) ADK Agent (Vertex AI Agent Development Kit)
+
+Used with:
+- Vertex AI Conversational Agents
+- ADK (Agent Development Kit)
+- Firestore
+- Gemini models
+
+
+======================================================
+IMPORTANT DESIGN RULES
+======================================================
+
+- Backend is a TOOL, not an agent
+- ADK is the AGENT (orchestrator)
+- Backend must ALWAYS:
+    * Return HTTP 200
+    * Return valid JSON
+    * Match OpenAPI schema exactly
+
+If backend returns 400 / 500 → Agent shows “Internal error”
+
+
+======================================================
+FILES REQUIRED
+======================================================
+
+BACKEND:
+--------
+1) main.py
+2) requirements.txt
+
+AGENT:
+------
+3) agent.py
+4) issue_management_openapi.yaml
+
+
+======================================================
+PROJECT STRUCTURE (RECOMMENDED)
+======================================================
+
+issue-management/
+│
+├── backend/
+│   ├── main.py
+│   └── requirements.txt
+│
+├── agent/
+│   ├── agent.py
+│   └── issue_management_openapi.yaml
+│
+└── README.md (optional)
+
+
+======================================================
+ONE-TIME GCP SETUP
+======================================================
+
+Set project:
+------------
+gcloud config set project platform-support-analyst-57565
+
+Enable required APIs:
+---------------------
+gcloud services enable \
+  cloudfunctions.googleapis.com \
+  cloudbuild.googleapis.com \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  firestore.googleapis.com \
+  aiplatform.googleapis.com
+
+
+======================================================
+BACKEND DEPLOYMENT (CLOUD FUNCTIONS GEN2)
+======================================================
+
+Navigate to backend folder:
+---------------------------
+cd backend
+
+Deploy command:
+---------------
+gcloud functions deploy submit_issue \
+  --gen2 \
+  --runtime python311 \
+  --region us-central1 \
+  --entry-point submit_issue \
+  --trigger-http \
+  --allow-unauthenticated
+
+Get backend URL:
+----------------
+gcloud functions describe submit_issue --gen2 \
+  --region us-central1 \
+  --format="value(serviceConfig.uri)"
+
+Save this URL.
+It will be used in the OpenAPI file.
+
+
+======================================================
+BACKEND TEST (MANDATORY)
+======================================================
+
+curl -X POST <BACKEND_URL> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "test-user",
+    "issue": "Unable to login to workflow",
+    "priority": "P1"
+  }'
+
+Expected response:
+------------------
+{
+  "issue_id": "INC-XXXXXXX",
+  "status": "created",
+  "assistant_reply": "..."
+}
+
+
+======================================================
+ADK AGENT SETUP
+======================================================
+
+Navigate to agent folder:
+-------------------------
+cd agent
+
+Update OpenAPI file:
+--------------------
+In issue_management_openapi.yaml:
+
+servers:
+  - url: <BACKEND_URL>
+
+Make sure:
+-----------
+- Request fields match backend exactly
+- Response fields:
+    issue_id
+    status
+    assistant_reply
+
+
+======================================================
+ADK AGENT DEPLOYMENT / RUN
+======================================================
+
+ADK agents are not deployed like Cloud Functions.
+They are executed as:
+- Local scripts
+- Or hosted services (later)
+
+Local run (development):
+------------------------
+python agent.py
+
+What happens:
+-------------
+1) User input is sent to ADK agent
+2) Agent reasons about intent
+3) Agent calls backend tool via OpenAPI
+4) Backend creates issue
+5) Agent responds with ticket ID
+
+
+======================================================
+IAM REQUIREMENTS
+======================================================
+
+Service Account used by backend must have:
+
+- roles/datastore.user
+- roles/aiplatform.user
+
+
+======================================================
+HOW BACKEND + ADK WORK TOGETHER
+======================================================
+
+User
+ ↓
+ADK Agent (Reasoning + Tool Choice)
+ ↓
+submit_issue (Backend Tool)
+ ↓
+Firestore + SLA + Gemini
+ ↓
+Structured JSON
+ ↓
+ADK Agent Response
+
+
+======================================================
+WHAT NOT TO DO
+======================================================
+
+- Do NOT put Firestore logic in ADK
+- Do NOT return non-200 from backend
+- Do NOT rely on OpenAPI defaults
+- Do NOT mix agent reasoning with backend logic
+- Do NOT over-engineer with LangChain
+
+
+======================================================
+FINAL NOTES
+======================================================
+
+- Backend is deterministic and stable
+- ADK handles intelligence and orchestration
+- This setup is enterprise-grade
+- Suitable for interviews and real production use
+
+END OF FILE
+======================================================
