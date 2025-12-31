@@ -1,14 +1,11 @@
 """
 Issue Management Backend
-Compatible with:
-- Vertex AI Conversational Agents
-- ADK (Agent Development Kit)
-- Cloud Run / Cloud Functions Gen2
+Cloud Functions Gen2 / Cloud Run SAFE version
 
-Guarantees:
-- Always HTTP 200
-- Always valid JSON schema
-- Never crashes agent
+Fixes:
+- Lazy Firestore initialization (prevents PORT=8080 startup failure)
+- Always returns HTTP 200
+- Agent & ADK compatible
 """
 
 from __future__ import annotations
@@ -28,7 +25,7 @@ from google import genai
 # Configuration
 # =====================================================
 PROJECT_ID: str = os.getenv(
-    "GOOGLE_CLOUD_PROJECT", "platform-support-analyst-57565"
+    "GOOGLE_CLOUD_PROJECT", "data-engineering-479617"
 )
 LOCATION: str = os.getenv("GCP_LOCATION", "us-central1")
 
@@ -44,7 +41,32 @@ SLA_POLICY: Dict[str, Dict[str, int]] = {
     "P4": {"response_mins": 480, "resolve_mins": 10080},
 }
 
-db = firestore.Client(project=PROJECT_ID)
+
+# =====================================================
+# Lazy clients (IMPORTANT)
+# =====================================================
+_firestore_db = None
+_genai_client = None
+
+
+def get_db():
+    """Lazy Firestore client (Cloud Run safe)."""
+    global _firestore_db
+    if _firestore_db is None:
+        _firestore_db = firestore.Client(project=PROJECT_ID)
+    return _firestore_db
+
+
+def get_genai_client():
+    """Lazy Gemini client."""
+    global _genai_client
+    if _genai_client is None:
+        _genai_client = genai.Client(
+            vertexai=True,
+            project=PROJECT_ID,
+            location=LOCATION,
+        )
+    return _genai_client
 
 
 # =====================================================
@@ -57,7 +79,6 @@ def utc_now() -> datetime:
 def compute_sla(priority: str) -> Dict[str, Any]:
     policy = SLA_POLICY.get(priority, SLA_POLICY["P3"])
     now = utc_now()
-
     return {
         "response_due_at": now + timedelta(minutes=policy["response_mins"]),
         "resolve_due_at": now + timedelta(minutes=policy["resolve_mins"]),
@@ -66,11 +87,7 @@ def compute_sla(priority: str) -> Dict[str, Any]:
 
 
 def json_response(payload: Dict[str, Any]):
-    """
-    Conversational Agents REQUIRE:
-    - HTTP 200
-    - Valid JSON
-    """
+    """ALWAYS return HTTP 200 for agents."""
     return (
         json.dumps(payload, ensure_ascii=False),
         200,
@@ -83,18 +100,11 @@ def json_response(payload: Dict[str, Any]):
     )
 
 
-def vertex_client() -> genai.Client:
-    return genai.Client(
-        vertexai=True,
-        project=PROJECT_ID,
-        location=LOCATION,
-    )
-
-
 def gemini_reply(issue_text: str) -> str:
+    """Safe Gemini call. Never crashes."""
     try:
-        client = vertex_client()
-        response = client.models.generate_content(
+        client = get_genai_client()
+        resp = client.models.generate_content(
             model=GEMINI_MODEL,
             contents=(
                 "You are a support assistant. "
@@ -102,13 +112,14 @@ def gemini_reply(issue_text: str) -> str:
                 f"Issue: {issue_text}"
             ),
         )
-        return (response.text or "").strip() or "Your issue has been logged."
+        return (resp.text or "").strip() or "Your issue has been logged."
     except Exception:
         traceback.print_exc()
         return "Your issue has been logged. Our support team will follow up."
 
 
 def upsert_user(reporter_id: str) -> None:
+    db = get_db()
     db.collection(USERS_COL).document(reporter_id).set(
         {
             "last_seen_at": firestore.SERVER_TIMESTAMP,
@@ -123,6 +134,7 @@ def create_issue(
     issue_text: str,
     priority: str,
 ) -> str:
+    db = get_db()
     issue_id = f"INC-{uuid.uuid4().hex[:8].upper()}"
 
     issue_doc = {
