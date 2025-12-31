@@ -1,0 +1,220 @@
+PROJECT: ISSUE MANAGEMENT + ADK AGENT (GCP)
+==========================================
+
+Project ID:
+-----------
+data-engineering-479617
+
+
+==================================================
+SECTION 1: BASIC PROJECT SETUP
+==================================================
+
+Set active project:
+-------------------
+gcloud config set project data-engineering-479617
+
+Set default region:
+-------------------
+gcloud config set functions/region us-central1
+gcloud config set run/region us-central1
+
+
+==================================================
+SECTION 2: ENABLE REQUIRED APIS (ONE TIME)
+==================================================
+
+gcloud services enable \
+  cloudfunctions.googleapis.com \
+  cloudbuild.googleapis.com \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  firestore.googleapis.com \
+  aiplatform.googleapis.com
+
+
+==================================================
+SECTION 3: CREATE FIRESTORE DATABASE (MANDATORY)
+==================================================
+
+Via GCP Console:
+----------------
+1. Go to Firestore
+2. Click "Create database"
+3. Select "Native mode"
+4. Choose region: us-central1
+5. Create
+
+NOTE:
+-----
+If Firestore is not created, Cloud Functions Gen2
+containers will crash at startup.
+
+
+==================================================
+SECTION 4: CREATE DEDICATED SERVICE ACCOUNT
+==================================================
+
+Create service account:
+-----------------------
+gcloud iam service-accounts create issue-backend-sa \
+  --project data-engineering-479617 \
+  --display-name="Issue Management Backend Service Account"
+
+Service account email:
+----------------------
+issue-backend-sa@data-engineering-479617.iam.gserviceaccount.com
+
+
+==================================================
+SECTION 5: GRANT REQUIRED IAM ROLES
+==================================================
+
+Firestore access:
+-----------------
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:issue-backend-sa@data-engineering-479617.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+
+Vertex AI (Gemini) access:
+--------------------------
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:issue-backend-sa@data-engineering-479617.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+Logging (recommended):
+----------------------
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:issue-backend-sa@data-engineering-479617.iam.gserviceaccount.com" \
+  --role="roles/logging.logWriter"
+
+
+==================================================
+SECTION 6: BACKEND DEPLOYMENT (CLOUD FUNCTIONS GEN2)
+==================================================
+
+Required files:
+---------------
+backend/
+  main.py
+  requirements.txt
+
+requirements.txt:
+-----------------
+functions-framework==3.5.0
+google-cloud-firestore>=2.13.0
+google-genai>=0.6.0
+
+
+Deploy command:
+---------------
+gcloud functions deploy submit_issue \
+  --project data-engineering-479617 \
+  --gen2 \
+  --runtime python311 \
+  --region us-central1 \
+  --entry-point submit_issue \
+  --trigger-http \
+  --allow-unauthenticated \
+  --service-account issue-backend-sa@data-engineering-479617.iam.gserviceaccount.com \
+  --timeout 120s
+
+
+Get backend URL:
+----------------
+gcloud functions describe submit_issue \
+  --gen2 \
+  --region us-central1 \
+  --format="value(serviceConfig.uri)"
+
+
+==================================================
+SECTION 7: BACKEND TEST (MANDATORY)
+==================================================
+
+curl -X POST <BACKEND_URL> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "test-user",
+    "issue": "Unable to login to workflow",
+    "priority": "P1"
+  }'
+
+Expected response:
+------------------
+{
+  "issue_id": "INC-XXXXXXX",
+  "status": "created",
+  "assistant_reply": "..."
+}
+
+
+==================================================
+SECTION 8: ADK AGENT SETUP
+==================================================
+
+Agent directory:
+----------------
+adk-agent/
+  agents.py
+  issue_management_openapi.yaml
+
+Install agent dependencies:
+---------------------------
+pip install --upgrade google-cloud-aiplatform pyyaml
+
+
+==================================================
+SECTION 9: OPENAPI FILE CONFIGURATION
+==================================================
+
+In issue_management_openapi.yaml:
+
+servers:
+  - url: <BACKEND_URL>
+
+NOTE:
+-----
+This YAML file is NOT deployed on GCP.
+It is read locally by the ADK agent.
+
+
+==================================================
+SECTION 10: RUN & TEST ADK AGENT
+==================================================
+
+Navigate to agent directory:
+----------------------------
+cd adk-agent
+
+Run agent:
+----------
+python3 agents.py
+
+Expected:
+---------
+- Agent starts
+- Tool is invoked
+- Backend receives request
+- Ticket is created
+- Issue ID is returned
+
+
+==================================================
+SECTION 11: COMMON ISSUES & NOTES
+==================================================
+
+- Cloud Functions Gen2 requires functions-framework
+- Import-time errors cause PORT=8080 failure
+- google-genai is required for: from google import genai
+- Tool.from_openapi() is NOT supported
+- Use Tool.from_openapi_spec()
+
+Golden Rule:
+------------
+If backend curl works, agent will work.
+
+
+==================================================
+END OF FILE
+==================================================
