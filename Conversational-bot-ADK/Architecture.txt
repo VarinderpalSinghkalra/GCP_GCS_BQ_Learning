@@ -1,0 +1,11 @@
+User
+ ↓
+ADK Agent (Reasoning + Orchestration)
+ ↓  (Tool call via OpenAPI)
+submit_issue (Cloud Run / Cloud Function)
+ ↓
+Firestore + Gemini
+ ↓
+Structured JSON
+ ↓
+ADK Agent → User
