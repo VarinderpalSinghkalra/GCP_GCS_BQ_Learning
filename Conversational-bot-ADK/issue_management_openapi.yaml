@@ -1,0 +1,47 @@
+openapi: 3.0.0
+info:
+  title: Issue Management API
+  version: 1.0.0
+servers:
+  - url: https://YOUR_CLOUD_RUN_URL   # <-- replace
+
+paths:
+  /:
+    post:
+      operationId: submitIssue
+      summary: Create a new support issue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reporter_id
+                - issue
+              properties:
+                reporter_id:
+                  type: string
+                issue:
+                  type: string
+                priority:
+                  type: string
+                  enum: [P1, P2, P3, P4]
+      responses:
+        "200":
+          description: Issue created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - issue_id
+                  - status
+                  - assistant_reply
+                properties:
+                  issue_id:
+                    type: string
+                  status:
+                    type: string
+                  assistant_reply:
+                    type: string
