@@ -51,7 +51,7 @@ issue_id = f"ISSUE-{uuid.uuid4().hex[:8].upper()}"
 
 logger.info("Issue created successfully: %s", issue_id)
 
-# ✅ SUCCESS RESPONSE (Gemini trusts this)
+#  SUCCESS RESPONSE (Gemini trusts this)
 return jsonify({
 "issue_id": issue_id,
 "assistant_reply": f"Your issue has been created successfully. Reference ID: {issue_id}",
@@ -61,7 +61,7 @@ return jsonify({
 except Exception as e:
 logger.exception("Issue creation failed")
 
-# ❌ FAILURE RESPONSE (used only when truly broken)
+#  FAILURE RESPONSE (used only when truly broken)
 return jsonify({
 "issue_id": None,
 "assistant_reply": "An internal error occurred while creating your issue. Please try again later.",
