@@ -1,0 +1,265 @@
+# Issue Management API – Debugging & Deployment Lessons
+
+This document captures the **end-to-end learning** from deploying, debugging, and successfully running the Issue Management API using **Cloud Functions Gen2, Firestore, and Vertex AI (Gemini)**. It is written as a practical lesson, not a tutorial copy, so it can be kept as a personal reference or shared internally.
+
+---
+
+## 1. Initial Goal
+
+The objective was to build and deploy an **agent-safe backend API** that:
+
+* Accepts issue details via HTTP
+* Persists data in Firestore
+* Uses Gemini (Vertex AI) for assistant responses
+* Always returns **HTTP 200** with valid JSON
+* Can be registered as a **Vertex AI Agent Tool** via OpenAPI
+
+---
+
+## 2. Deployment Model Chosen
+
+We deployed using:
+
+* **Cloud Functions (Gen2)**
+* Runtime: Python 3.11
+* Trigger: HTTP
+* Custom service account: `issue-backend-sa`
+
+Key realization:
+
+> Cloud Functions Gen2 run **on Cloud Run internally**, so debugging requires understanding **both**.
+
+---
+
+## 3. First Symptom Observed
+
+The function deployed successfully, but every API call returned:
+
+```json
+{
+  "issue_id": "ERROR",
+  "status": "failed",
+  "assistant_reply": "An internal error occurred, but your issue was received."
+}
+```
+
+Important insight:
+
+* This response meant the **exception handler was working correctly**
+* The failure was happening *inside* the business logic (Firestore / Gemini)
+
+---
+
+## 4. Major Debugging Breakthrough: Logs
+
+Reading logs using:
+
+```bash
+gcloud functions logs read submit_issue --region us-central1
+```
+
+revealed the real error:
+
+```
+404 The database (default) does not exist for project data-engineering-479617
+```
+
+---
+
+## 5. Root Cause #1 – Firestore Was Never Initialized
+
+### 5.1 Firestore Creation Step (Mandatory Setup)
+
+Before any Cloud Function or Cloud Run service can write data, a **Firestore database must exist** in the project. Merely enabling the Firestore API is **not sufficient**.
+
+#### Command to create Firestore (Native mode)
+
+```bash
+gcloud firestore databases create \
+  --project data-engineering-479617 \
+  --location=nam5
+```
+
+> `nam5` is a multi-region location suitable for India/global workloads.
+> You may also choose a regional location like `asia-south1` if required.
+
+#### Verify Firestore creation
+
+```bash
+gcloud firestore databases list --project data-engineering-479617
+```
+
+Expected output:
+
+```
+DATABASE_ID   LOCATION_ID   TYPE
+(default)    nam5          FIRESTORE_NATIVE
+```
+
+⚠️ Important notes:
+
+* The database **must be `(default)`**
+* The type **must be `FIRESTORE_NATIVE`**
+* `DATASTORE_MODE` will not work with the Firestore SDK used in this project
+
+Only after this step will Firestore write operations succeed.
+
+---
+
+## 5. Root Cause #1 – Firestore Was Never Initialized
+
+Key lesson:
+
+> Enabling the Firestore API is NOT enough. The database itself must exist.
+
+### Fix Applied
+
+```bash
+gcloud firestore databases create \
+  --project data-engineering-479617 \
+  --location=nam5
+```
+
+Verification:
+
+```bash
+gcloud firestore databases list
+```
+
+Result:
+
+* `(default)` database created
+* Mode: `FIRESTORE_NATIVE`
+
+---
+
+## 6. Root Cause #2 – Incorrect Gemini Import
+
+Earlier logs also showed:
+
+```
+ImportError: cannot import name 'genai' from 'google'
+```
+
+### Why This Happened
+
+The Gemini SDK is **not imported as `from google import genai`**.
+The correct module path is different.
+
+### Fix Applied
+
+**requirements.txt**
+
+```
+google-genai>=0.5.0
+google-cloud-firestore>=2.11.0
+functions-framework>=3.5.0
+```
+
+**main.py**
+
+```python
+import google.genai as genai
+```
+
+After this fix, container startup errors disappeared.
+
+---
+
+## 7. IAM Was Correct (But Initially Misleading)
+
+IAM roles added earlier were correct:
+
+* `roles/datastore.user`
+* `roles/aiplatform.user`
+
+However, IAM could not help until:
+
+* Firestore database existed
+* Correct project ID was being used
+
+Lesson:
+
+> **Infrastructure existence comes before permissions.**
+
+---
+
+## 8. Final Successful Test
+
+After fixes and redeploy:
+
+```bash
+curl -X POST https://submit-issue-277069041958.us-central1.run.app \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "deployment-test",
+    "issue": "Cloud Run deployment verification",
+    "priority": "P3"
+  }'
+```
+
+Response:
+
+```json
+{
+  "issue_id": "INC-2303565C",
+  "status": "created",
+  "assistant_reply": "Certainly, Cloud Run deployment verification."
+}
+```
+
+This confirmed:
+
+* Firestore writes succeeded
+* Gemini responded correctly
+* SLA logic executed
+* API contract held
+
+---
+
+## 9. OpenAPI File – Where It Fits
+
+Important clarification:
+
+* `openapi.yaml` is **NOT used by the Cloud Function code**
+* It is used by **Vertex AI Agent Builder** to register the API as a tool
+
+The OpenAPI spec was updated to:
+
+* Match the Cloud Function exactly
+* Reflect **always HTTP 200** behavior
+* Remove 400/500 responses
+
+---
+
+## 10. Key Engineering Takeaways
+
+1. **Logs > Assumptions**
+   Always read Cloud Function / Cloud Run logs before guessing.
+
+2. **Firestore must be explicitly created**
+   APIs enabled ≠ database exists.
+
+3. **Safe error handling can hide infra bugs**
+   Always-200 design is correct for agents, but makes logs essential.
+
+4. **Gen2 Functions = Cloud Run mindset**
+   Treat Gen2 debugging like Cloud Run debugging.
+
+5. **OpenAPI is for agents, not runtime**
+   Backend works independently of OpenAPI files.
+
+---
+
+## 11. Current Status
+
+✅ Cloud Function Gen2 – Working
+✅ Firestore Native – Working
+✅ Gemini (Vertex AI) – Working
+✅ OpenAPI – Agent-ready
+
+System is now **production-ready and agent-compatible**.
+
+---
+
+(End of lesson document)
