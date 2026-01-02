@@ -1,0 +1,240 @@
+ARCHITECTURE – Firestore to BigQuery Real-Time Pipeline
+
+==================================================
+
+SYSTEM OVERVIEW
+
+This architecture implements a real-time, event-driven data pipeline on Google Cloud Platform.
+It supports both manual API ingestion and Firestore-triggered events, with streaming analytics
+into BigQuery.
+
+==================================================
+
+HIGH-LEVEL ARCHITECTURE
+
+```
+                +----------------------+
+                |   Client / User UI   |
+                |  (curl / Postman)    |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |      Cloud Run       |
+                |  (firestore-to-      |
+                |    pubsub service)   |
+                |                      |
+                | - Flask + Gunicorn   |
+                | - Stateless          |
+                | - Dual entry support |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |       Pub/Sub        |
+                |   Topic: issues-     |
+                |          topic       |
+                |                      |
+                | - Buffering          |
+                | - Decoupling         |
+                | - Retry handling     |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |      Dataflow        |
+                |  Streaming Template |
+                |  (PubSub_to_BQ)     |
+                |                      |
+                | - Apache Beam        |
+                | - Auto scaling       |
+                | - Back-pressure      |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |      BigQuery        |
+                |  Dataset: issues_ds |
+                |  Table: issues_      |
+                |         stream       |
+                |                      |
+                | - Analytics-ready    |
+                | - Append-only        |
+                +----------------------+
+```
+
+==================================================
+
+FIRESTORE EVENT FLOW (EVENT-DRIVEN PATH)
+
+```
+                +----------------------+
+                |      Firestore       |
+                |   Collection: issues|
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |       Eventarc       |
+                |  (protobuf events)  |
+                |                      |
+                | - Firestore trigger  |
+                | - Exactly-once       |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |      Cloud Run       |
+                |  (same service)     |
+                |                      |
+                | - Decodes protobuf   |
+                | - Normalizes data    |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |       Pub/Sub        |
+                |   (same topic)       |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |      Dataflow        |
+                +----------+-----------+
+                           |
+                           v
+                +----------------------+
+                |      BigQuery        |
+                +----------------------+
+```
+
+==================================================
+
+COMPONENT RESPONSIBILITIES
+
+Cloud Run (firestore-to-pubsub)
+
+* Entry point for all events
+* Accepts:
+
+  * Manual API JSON
+  * Firestore Eventarc protobuf
+* Converts all payloads to flat JSON
+* Publishes messages to Pub/Sub
+* No direct database writes
+
+Pub/Sub
+
+* Buffers traffic spikes
+* Decouples ingestion from analytics
+* Enables replay and retry
+* Supports multiple consumers
+
+Dataflow (Streaming)
+
+* Reads from Pub/Sub subscription
+* Uses Google-managed template
+* Handles:
+
+  * Scaling
+  * Retry
+  * Back-pressure
+* Streams data continuously into BigQuery
+
+BigQuery
+
+* Final analytics store
+* Append-only ingestion
+* Schema-controlled
+* Query-ready for dashboards
+
+Eventarc
+
+* Listens to Firestore document writes
+* Delivers protobuf events
+* Guarantees reliable delivery to Cloud Run
+
+==================================================
+
+DATA CONTRACT (IMPORTANT)
+
+Pub/Sub Message Format (FLAT JSON ONLY):
+
+{
+"issue_id": "INC-XXXXXXX",
+"source": "manual-api | firestore-eventarc",
+"created_at": "ISO-8601 timestamp",
+"payload": "JSON string"
+}
+
+NOTE:
+Nested objects are NOT allowed for Dataflow templates.
+All nested structures must be stringified.
+
+==================================================
+
+DEPLOYMENT REGIONS
+
+Cloud Run        : us-central1
+Pub/Sub          : global
+Dataflow         : us-central1
+BigQuery         : US
+Firestore        : nam5
+Eventarc Trigger : nam5
+
+==================================================
+
+DESIGN PRINCIPLES FOLLOWED
+
+* Stateless services
+* Loose coupling
+* Asynchronous communication
+* Streaming-first design
+* Schema safety at ingestion
+* Production-grade observability
+
+==================================================
+
+SCALING BEHAVIOR
+
+* Cloud Run scales by request volume
+* Pub/Sub absorbs burst traffic
+* Dataflow scales workers automatically
+* BigQuery handles high-throughput inserts
+
+==================================================
+
+FAILURE HANDLING
+
+* Cloud Run failures do not impact Pub/Sub
+* Pub/Sub retries on transient failures
+* Dataflow retries messages automatically
+* Schema mismatch results in message drop (must be monitored)
+
+==================================================
+
+EXTENSION POINTS
+
+* Dead-letter Pub/Sub topic
+* Custom Dataflow (Apache Beam) pipeline
+* Structured BigQuery schema
+* Looker Studio dashboards
+* SLA and priority-based routing
+
+==================================================
+
+ARCHITECTURE STATUS
+
+Design Type     : Event-driven, streaming
+Maturity        : Production-ready
+Coupling        : Loosely coupled
+Scalability     : Horizontal
+Fault Tolerance : High
+
+==================================================
+
+END OF ARCHITECTURE FILE
+
+==================================================
+
+
