@@ -1,0 +1,251 @@
+LESSON DOCUMENT
+Firestore → BigQuery Real-Time Pipeline
+Errors Faced & Fixes Applied
+
+==================================================
+
+PROJECT CONTEXT
+
+Project ID        : data-engineering-479617
+Pipeline Goal     : Real-time Firestore / API → BigQuery
+Runtime           : Cloud Run (Cloud Functions Gen2)
+Streaming Engine  : Dataflow
+Messaging         : Pub/Sub
+
+==================================================
+
+LESSON 1: Eventarc trigger creation failed (invalid content type)
+
+ERROR:
+INVALID_ARGUMENT: invalid value for trigger.event_data_content_type
+
+CAUSE:
+Firestore Eventarc triggers require protobuf payloads.
+If event-data-content-type is omitted, gcloud sends an empty value.
+
+FIX:
+Explicitly specify protobuf content type.
+
+COMMAND USED:
+--event-data-content-type=application/protobuf
+
+LEARNING:
+Firestore + Eventarc ALWAYS requires protobuf content type.
+
+==================================================
+
+LESSON 2: Eventarc trigger FAILED_PRECONDITION (Cloud Run not ready)
+
+ERROR:
+FAILED_PRECONDITION: Cloud Run service is not ready
+
+CAUSE:
+Eventarc can only attach to a READY Cloud Run service.
+Cloud Run was crashing during startup.
+
+FIX:
+Investigated Cloud Run logs and fixed application crashes.
+
+COMMAND USED:
+gcloud run services logs read firestore-to-pubsub --region us-central1
+
+LEARNING:
+Eventarc does not deploy services; it only attaches to healthy ones.
+
+==================================================
+
+LESSON 3: Cloud Run crashed with KeyError: GOOGLE_CLOUD_PROJECT
+
+ERROR:
+KeyError: 'GOOGLE_CLOUD_PROJECT'
+
+CAUSE:
+Accessed environment variable using:
+os.environ["GOOGLE_CLOUD_PROJECT"]
+
+This variable is not guaranteed in Cloud Run.
+
+FIX:
+Use safe access with default.
+
+CODE FIX:
+os.environ.get("GOOGLE_CLOUD_PROJECT", "data-engineering-479617")
+
+LEARNING:
+Never use os.environ["VAR"] in serverless runtimes.
+
+==================================================
+
+LESSON 4: Gunicorn failed to start application
+
+ERROR:
+Failed to find attribute 'app' in 'main'
+
+CAUSE:
+Gunicorn expects an object named `app` in main.py.
+Flask app was not exposed correctly.
+
+FIX:
+Define Flask instance explicitly.
+
+CODE FIX:
+app = Flask(**name**)
+
+LEARNING:
+Gunicorn ALWAYS requires `app` to exist.
+
+==================================================
+
+LESSON 5: Cloud Run logs showed no requests
+
+SYMPTOM:
+No logs except gunicorn startup / shutdown.
+
+CAUSE:
+Wrong Cloud Run URL was being tested.
+Requests were sent to a different service.
+
+FIX:
+Verified service name and used correct URL.
+
+COMMAND USED:
+gcloud run services describe firestore-to-pubsub
+
+LEARNING:
+Always test against the exact deployed service URL.
+
+==================================================
+
+LESSON 6: Pub/Sub subscription showed "Listed 0 items"
+
+SYMPTOM:
+gcloud pubsub subscriptions pull returned 0 messages.
+
+CAUSE:
+Messages were never published because:
+
+* Wrong Cloud Run URL OR
+* Missing Pub/Sub IAM OR
+* Code not executed
+
+FIX:
+
+1. Fixed Cloud Run URL
+2. Granted Pub/Sub publisher role
+3. Redeployed Cloud Run after IAM change
+
+COMMAND USED:
+roles/pubsub.publisher
+
+LEARNING:
+IAM changes require Cloud Run redeploy.
+
+==================================================
+
+LESSON 7: Dataflow job running but BigQuery empty
+
+SYMPTOM:
+Dataflow JOB_STATE_RUNNING
+BigQuery table had 0 rows.
+
+CAUSE:
+Dataflow PubSub_to_BigQuery template only accepts flat JSON.
+Published messages contained nested JSON objects.
+
+BAD MESSAGE:
+"payload": { "priority": "P1" }
+
+FIX:
+Convert nested payload to JSON string before publishing.
+
+CODE FIX:
+"payload": json.dumps(payload)
+
+LEARNING:
+Dataflow templates silently drop schema-mismatched records.
+
+==================================================
+
+LESSON 8: Firestore document creation via gcloud failed
+
+ERROR:
+Invalid choice: 'documents'
+
+CAUSE:
+gcloud firestore CLI does not support document CRUD.
+
+FIX:
+Used Firestore Console, SDK, or REST API instead.
+
+LEARNING:
+Firestore data operations are not supported via gcloud CLI.
+
+==================================================
+
+LESSON 9: Dataflow streaming job never finishes
+
+CONFUSION:
+Job stays RUNNING indefinitely.
+
+CAUSE:
+Streaming Dataflow jobs are designed to run continuously.
+
+FIX:
+Validated job health instead of waiting for completion.
+
+COMMAND USED:
+gcloud dataflow jobs describe <JOB_ID>
+
+LEARNING:
+JOB_STATE_RUNNING is SUCCESS for streaming jobs.
+
+==================================================
+
+LESSON 10: Eventarc trigger ALREADY_EXISTS error
+
+ERROR:
+ALREADY_EXISTS: trigger already exists
+
+CAUSE:
+Trigger was already created successfully earlier.
+
+FIX:
+Verified trigger instead of recreating it.
+
+COMMAND USED:
+gcloud eventarc triggers describe firestore-issues-trigger
+
+LEARNING:
+ALREADY_EXISTS is not a failure.
+
+==================================================
+
+FINAL STABLE STATE
+
+Cloud Run        : Healthy
+Eventarc         : Working
+Pub/Sub          : Publishing
+Dataflow         : Streaming (RUNNING)
+BigQuery         : Receiving data
+
+PIPELINE STATUS  : PRODUCTION READY
+
+==================================================
+
+KEY OVERALL LEARNINGS
+
+1. Serverless requires defensive coding
+2. Flat JSON is mandatory for Dataflow templates
+3. Cloud Run + Pub/Sub is safer than direct BigQuery writes
+4. Streaming systems fail silently if schema is wrong
+5. Observability (logs) is critical
+6. IAM changes require redeployment
+7. Correct URLs matter more than code sometimes
+
+==================================================
+
+END OF LESSON DOCUMENT
+
+==================================================
+
+
