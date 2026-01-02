@@ -1,0 +1,270 @@
+SETUP GUIDE
+Firestore → BigQuery Real-Time Pipeline
+(Reusable for Any GCP Project)
+
+==================================================
+
+PURPOSE OF THIS DOCUMENT
+
+This document explains how to set up the same real-time pipeline
+(Firestore / API → Pub/Sub → Dataflow → BigQuery)
+in a NEW Google Cloud project.
+
+Only a few values need to be changed.
+All commands are provided in the correct order.
+
+==================================================
+
+SECTION 1: VALUES YOU MUST CHANGE
+
+Before starting, replace the following values everywhere in this document:
+
+PROJECT_ID
+Example:
+my-gcp-project-123
+
+PROJECT_NUMBER
+(Find using command below)
+
+REGION
+Example:
+us-central1
+
+FIRESTORE_LOCATION
+Example:
+nam5   OR   eur3   OR   asia-south1
+
+SERVICE_ACCOUNT
+Example:
+[my-gcp-project-123@appspot.gserviceaccount.com](mailto:my-gcp-project-123@appspot.gserviceaccount.com)
+
+==================================================
+
+SECTION 2: SET YOUR VARIABLES (REFERENCE)
+
+PROJECT_ID=my-gcp-project-123
+REGION=us-central1
+FIRESTORE_LOCATION=nam5
+
+Cloud Run Service Name:
+firestore-to-pubsub
+
+Pub/Sub Topic:
+issues-topic
+
+BigQuery Dataset:
+issues_ds
+
+BigQuery Table:
+issues_stream
+
+==================================================
+
+SECTION 3: GET PROJECT NUMBER (REQUIRED)
+
+Run this command:
+
+gcloud projects describe PROJECT_ID --format="value(projectNumber)"
+
+Save the output as:
+
+PROJECT_NUMBER=XXXXXXXXXXXX
+
+==================================================
+
+SECTION 4: ENABLE REQUIRED APIS
+
+Run once per project:
+
+gcloud services enable 
+run.googleapis.com 
+eventarc.googleapis.com 
+firestore.googleapis.com 
+pubsub.googleapis.com 
+dataflow.googleapis.com 
+bigquery.googleapis.com 
+cloudbuild.googleapis.com
+
+==================================================
+
+SECTION 5: FIRESTORE SETUP
+
+Create Firestore in Native mode if not already created.
+
+Choose location:
+FIRESTORE_LOCATION (must match Eventarc trigger later)
+
+Collection name used:
+issues
+
+(No documents needed at this stage)
+
+==================================================
+
+SECTION 6: CLOUD RUN SERVICE DEPLOYMENT
+
+Prepare source code:
+
+* main.py
+* requirements.txt
+* Flask + Gunicorn app
+
+Deploy Cloud Run:
+
+gcloud run deploy firestore-to-pubsub 
+--source . 
+--region REGION 
+--service-account [PROJECT_ID@appspot.gserviceaccount.com](mailto:PROJECT_ID@appspot.gserviceaccount.com) 
+--allow-unauthenticated
+
+Verify service:
+
+gcloud run services describe firestore-to-pubsub 
+--region REGION
+
+IMPORTANT:
+Save the service URL printed here.
+All curl tests must use THIS URL.
+
+==================================================
+
+SECTION 7: PUB/SUB SETUP
+
+Create Pub/Sub topic:
+
+gcloud pubsub topics create issues-topic
+
+(Optional debug subscription)
+
+gcloud pubsub subscriptions create issues-debug-sub 
+--topic issues-topic
+
+==================================================
+
+SECTION 8: IAM – PUB/SUB PUBLISHER
+
+Grant Pub/Sub publish permission to Cloud Run service account:
+
+gcloud projects add-iam-policy-binding PROJECT_ID 
+--member="serviceAccount:PROJECT_ID@appspot.gserviceaccount.com" 
+--role="roles/pubsub.publisher"
+
+IMPORTANT:
+After IAM changes, redeploy Cloud Run again.
+
+==================================================
+
+SECTION 9: BIGQUERY SETUP
+
+Create dataset:
+
+bq mk --location=US issues_ds
+
+Create table (flat schema required):
+
+bq mk 
+--table PROJECT_ID:issues_ds.issues_stream 
+issue_id:STRING,source:STRING,created_at:STRING,payload:STRING
+
+==================================================
+
+SECTION 10: DATAFLOW STREAMING JOB
+
+Run Dataflow Pub/Sub → BigQuery template:
+
+gcloud dataflow jobs run issues-pubsub-to-bq 
+--gcs-location gs://dataflow-templates/latest/PubSub_to_BigQuery 
+--region REGION 
+--parameters 
+inputTopic=projects/PROJECT_ID/topics/issues-topic,
+outputTableSpec=PROJECT_ID:issues_ds.issues_stream
+
+Verify job:
+
+gcloud dataflow jobs list --region REGION
+
+Expected state:
+JOB_STATE_RUNNING
+
+NOTE:
+Streaming jobs stay RUNNING permanently.
+
+==================================================
+
+SECTION 11: EVENTARC SETUP (FIRESTORE → CLOUD RUN)
+
+Create Eventarc trigger:
+
+gcloud eventarc triggers create firestore-issues-trigger 
+--location FIRESTORE_LOCATION 
+--destination-run-service firestore-to-pubsub 
+--destination-run-region REGION 
+--event-filters="type=google.cloud.firestore.document.v1.written" 
+--event-filters="database=(default)" 
+--event-filters-path-pattern="document=projects/PROJECT_ID/databases/(default)/documents/issues/{docId}" 
+--event-data-content-type=application/protobuf 
+--service-account [PROJECT_ID@appspot.gserviceaccount.com](mailto:PROJECT_ID@appspot.gserviceaccount.com)
+
+Verify trigger:
+
+gcloud eventarc triggers list --location FIRESTORE_LOCATION
+
+==================================================
+
+SECTION 12: TEST MANUAL API INGESTION
+
+Use the Cloud Run URL:
+
+curl -X POST CLOUD_RUN_URL 
+-H "Content-Type: application/json" 
+-d '{
+"reporter_id": "test-user",
+"issue": "Pipeline setup test",
+"priority": "P2"
+}'
+
+==================================================
+
+SECTION 13: VERIFY BIGQUERY INGESTION
+
+Wait 5–10 seconds, then run:
+
+bq query --use_legacy_sql=false '
+SELECT *
+FROM `PROJECT_ID.issues_ds.issues_stream`
+ORDER BY created_at DESC
+LIMIT 10
+'
+
+If rows appear, pipeline is working.
+
+==================================================
+
+SECTION 14: COMMON MISTAKES TO AVOID
+
+1. Using wrong Cloud Run URL
+2. Forgetting to redeploy after IAM change
+3. Publishing nested JSON to Pub/Sub
+4. Expecting Dataflow streaming job to finish
+5. Firestore location mismatch with Eventarc
+6. Using os.environ["VAR"] instead of get()
+
+==================================================
+
+FINAL CHECKLIST
+
+Cloud Run      : Deployed and healthy
+Pub/Sub        : Topic exists
+Dataflow       : JOB_STATE_RUNNING
+BigQuery       : Receiving rows
+Eventarc       : Trigger active
+
+PIPELINE STATUS: READY FOR USE
+
+==================================================
+
+END OF SETUP GUIDE
+
+==================================================
+
+
