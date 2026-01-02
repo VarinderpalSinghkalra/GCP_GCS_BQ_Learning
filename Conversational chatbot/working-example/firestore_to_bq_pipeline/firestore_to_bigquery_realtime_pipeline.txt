@@ -1,0 +1,319 @@
+
+Production-grade real-time data ingestion pipeline built on Google Cloud Platform.
+
+---
+
+## 1. Objective
+
+Build a scalable, fault-tolerant real-time pipeline that:
+
+- Accepts issues via HTTP (curl / UI)
+- Listens to Firestore changes in real time
+- Publishes events to Pub/Sub
+- Streams data into BigQuery using Dataflow
+- Keeps ingestion decoupled from analytics
+- Avoids direct writes to BigQuery from APIs
+
+---
+
+## 2. Final Architecture
+
+```
+
+Manual API (curl / UI)
+|
+v
+Cloud Run (Cloud Functions Gen2 runtime)
+|
+v
+Pub/Sub
+|
+v
+Dataflow (Streaming)
+|
+v
+BigQuery
+
+```
+
+### Firestore Event Flow
+
+```
+
+Firestore
+|
+Eventarc (protobuf events)
+|
+Cloud Run
+|
+Pub/Sub
+|
+Dataflow
+|
+BigQuery
+
+```
+
+---
+
+## 3. Why This Architecture
+
+- **Cloud Run** remains stateless and horizontally scalable
+- **Pub/Sub** buffers traffic spikes and decouples producers/consumers
+- **Dataflow** handles streaming, retries, and back-pressure
+- **BigQuery** is protected from burst writes
+- Each layer scales independently
+
+This is a standard enterprise pattern for real-time analytics on GCP.
+
+---
+
+## 4. Cloud Run Service (`firestore-to-pubsub`)
+
+### Purpose
+
+Acts as the **single ingestion layer** for:
+- Manual API requests (curl / UI)
+- Firestore Eventarc events
+
+Publishes **flat JSON messages** to Pub/Sub.
+
+### Key Learnings
+
+- Gunicorn **requires** `app = Flask(__name__)`
+- Never access environment variables using `os.environ["VAR"]`
+- Always use `os.environ.get("VAR", default)`
+- Cloud Run restarts containers silently if the app crashes
+
+---
+
+## 5. Pub/Sub Design
+
+**Topic**
+```
+
+issues-topic
+
+```
+
+**Subscription (debug only)**
+```
+
+issues-debug-sub
+
+```
+
+### Why Pub/Sub
+
+- Absorbs spikes
+- Enables replay
+- Decouples ingestion from analytics
+- Allows multiple downstream consumers
+
+---
+
+## 6. Dataflow Streaming Job
+
+**Template Used**
+```
+
+PubSub_to_BigQuery
+
+```
+
+**Job Type**
+```
+
+STREAMING
+
+````
+
+### Critical Rule (Important)
+
+The Dataflow template **only accepts flat JSON**.
+
+❌ This fails silently:
+```json
+"payload": { "priority": "P1" }
+````
+
+✅ This works:
+
+```json
+"payload": "{\"priority\":\"P1\"}"
+```
+
+All nested objects must be converted to **JSON strings** before publishing.
+
+---
+
+## 7. BigQuery Schema
+
+**Dataset**
+
+```
+issues_ds
+```
+
+**Table**
+
+```
+issues_stream
+```
+
+**Schema**
+
+```
+issue_id     STRING
+source       STRING
+created_at   STRING
+payload      STRING
+```
+
+### Reasoning
+
+* Prevents schema mismatch during streaming
+* Avoids silent ingestion failures
+* Allows schema evolution later
+
+---
+
+## 8. Cloud Run `main.py` (Production-Safe)
+
+```python
+import os
+import base64
+import json
+import uuid
+import logging
+from datetime import datetime
+from flask import Flask, request, jsonify
+from google.cloud import pubsub_v1
+
+logging.basicConfig(level=logging.INFO)
+
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "data-engineering-479617")
+TOPIC_ID = os.environ.get("ISSUES_TOPIC", "issues-topic")
+
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(PROJECT_ID, TOPIC_ID)
+
+app = Flask(__name__)
+
+def generate_issue_id():
+    return f"INC-{uuid.uuid4().hex[:8].upper()}"
+
+def publish_to_pubsub(message):
+    data = json.dumps(message).encode("utf-8")
+    publisher.publish(topic_path, data=data)
+
+@app.route("/", methods=["POST"])
+def handler():
+    payload = request.get_json(silent=True)
+
+    # Firestore Eventarc
+    if payload and "data" in payload:
+        decoded = base64.b64decode(payload["data"]).decode("utf-8", errors="ignore")
+        publish_to_pubsub({
+            "issue_id": f"FS-{uuid.uuid4().hex[:8].upper()}",
+            "source": "firestore-eventarc",
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "payload": decoded
+        })
+        return ("OK", 204)
+
+    # Manual API
+    if payload:
+        issue_id = generate_issue_id()
+        publish_to_pubsub({
+            "issue_id": issue_id,
+            "source": "manual-api",
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "payload": json.dumps(payload)
+        })
+        return jsonify({"issue_id": issue_id, "status": "created"}), 200
+
+    return jsonify({"error": "Empty request"}), 400
+```
+
+---
+
+## 9. Commands Reference
+
+### Deploy Cloud Run
+
+```bash
+gcloud run deploy firestore-to-pubsub \
+  --source . \
+  --region us-central1 \
+  --service-account data-engineering-479617@appspot.gserviceaccount.com \
+  --allow-unauthenticated
+```
+
+### Create Pub/Sub Topic
+
+```bash
+gcloud pubsub topics create issues-topic
+```
+
+### Run Dataflow Job
+
+```bash
+gcloud dataflow jobs run issues-pubsub-to-bq \
+  --gcs-location gs://dataflow-templates/latest/PubSub_to_BigQuery \
+  --region us-central1 \
+  --parameters \
+inputTopic=projects/data-engineering-479617/topics/issues-topic,\
+outputTableSpec=data-engineering-479617:issues_ds.issues_stream
+```
+
+---
+
+## 10. Verification
+
+### API Test
+
+```bash
+curl -X POST https://firestore-to-pubsub-277069041958.us-central1.run.app \
+  -H "Content-Type: application/json" \
+  -d '{"issue":"Test","priority":"P1"}'
+```
+
+### BigQuery Validation
+
+```sql
+SELECT *
+FROM `data-engineering-479617.issues_ds.issues_stream`
+ORDER BY created_at DESC;
+```
+
+---
+
+## 11. Key Lessons Learned
+
+* Dataflow streaming jobs remain **RUNNING** by design
+* Schema mismatch causes **silent BigQuery drops**
+* Flat JSON is mandatory for Dataflow templates
+* Pub/Sub is safer than direct BigQuery inserts
+* Correct Cloud Run URL is critical during testing
+
+---
+
+## 12. Future Enhancements
+
+* Exactly-once / deduplication logic
+* Dead-letter Pub/Sub topic
+* Structured BigQuery schema
+* Firestore protobuf parsing
+* Looker Studio dashboards
+* Cost optimization
+
+---
+
+**Status:** Production-ready real-time pipeline
+**Ready for Git commit**
+
+```
+
+
+```
