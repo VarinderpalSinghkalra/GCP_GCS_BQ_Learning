@@ -1,0 +1,61 @@
+====================================================
+FIRESTORE → GCS EXPORT (GCLOUD COMMANDS)
+====================================================
+
+# Set active project
+gcloud config set project YOUR_PROJECT_ID
+
+
+# Get project number
+gcloud projects describe YOUR_PROJECT_ID \
+  --format="value(projectNumber)"
+
+
+# Firestore managed service account (REFERENCE)
+# service-<PROJECT_NUMBER>@gcp-sa-firestore.iam.gserviceaccount.com
+
+
+# Grant GCS write permission to Firestore service account
+gcloud storage buckets add-iam-policy-binding gs://YOUR_BUCKET_NAME \
+  --member="serviceAccount:service-<PROJECT_NUMBER>@gcp-sa-firestore.iam.gserviceaccount.com" \
+  --role="roles/storage.objectAdmin"
+
+
+# Grant Firestore export permission (project level)
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:service-<PROJECT_NUMBER>@gcp-sa-firestore.iam.gserviceaccount.com" \
+  --role="roles/datastore.importExportAdmin"
+
+
+# Export ALL Firestore collections
+gcloud firestore export gs://YOUR_BUCKET_NAME/firestore-export
+
+
+# Export SPECIFIC collections
+gcloud firestore export gs://YOUR_BUCKET_NAME/firestore-export \
+  --collection-ids=issues,users,comments
+
+
+# List export operations
+gcloud firestore operations list
+
+
+# Describe export operation
+gcloud firestore operations describe OPERATION_ID
+
+
+# Verify exported files in GCS
+gcloud storage ls gs://YOUR_BUCKET_NAME/firestore-export/
+
+
+====================================================
+NOTES
+====================================================
+
+- Service account cannot be passed in export command
+- Firestore always uses:
+  service-<PROJECT_NUMBER>@gcp-sa-firestore.iam.gserviceaccount.com
+- Bucket must be in same region as Firestore
+- Firestore must be in Native mode
+
+====================================================
