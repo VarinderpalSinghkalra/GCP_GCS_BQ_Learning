@@ -1,0 +1,276 @@
+LEARNING DOCUMENT
+Firestore to BigQuery – Real-Time Pipeline (GCP)
+
+==================================================
+
+PROJECT ID
+data-engineering-479617
+
+REGION
+us-central1
+
+FIRESTORE LOCATION
+nam5
+
+==================================================
+
+STEP 0: Goal
+
+Build a real-time pipeline on Google Cloud where:
+
+* API or Firestore events are ingested via Cloud Run
+* Events are published to Pub/Sub
+* Dataflow streams data into BigQuery
+* Pipeline is production-grade and scalable
+
+==================================================
+
+STEP 1: Enable Required APIs
+
+Run these once for the project:
+
+gcloud services enable 
+run.googleapis.com 
+eventarc.googleapis.com 
+firestore.googleapis.com 
+pubsub.googleapis.com 
+dataflow.googleapis.com 
+bigquery.googleapis.com 
+cloudbuild.googleapis.com
+
+==================================================
+
+STEP 2: Firestore Setup
+
+Firestore is already created in Native mode.
+
+Firestore location:
+nam5
+
+Collection used:
+issues
+
+==================================================
+
+STEP 3: Create Cloud Run Service (Cloud Functions Gen2 style)
+
+Source code includes:
+
+* Flask app
+* Gunicorn
+* main.py
+* requirements.txt
+
+Deploy Cloud Run:
+
+gcloud run deploy firestore-to-pubsub 
+--source . 
+--region us-central1 
+--service-account [data-engineering-479617@appspot.gserviceaccount.com](mailto:data-engineering-479617@appspot.gserviceaccount.com) 
+--allow-unauthenticated
+
+Verify service:
+
+gcloud run services describe firestore-to-pubsub 
+--region us-central1
+
+IMPORTANT:
+Use the URL shown here for all curl tests.
+
+==================================================
+
+STEP 4: Create Pub/Sub Topic and Subscription
+
+Create topic:
+
+gcloud pubsub topics create issues-topic
+
+Create debug subscription (optional but useful):
+
+gcloud pubsub subscriptions create issues-debug-sub 
+--topic issues-topic
+
+==================================================
+
+STEP 5: Grant Pub/Sub Publisher Permission to Cloud Run
+
+Cloud Run service account:
+[data-engineering-479617@appspot.gserviceaccount.com](mailto:data-engineering-479617@appspot.gserviceaccount.com)
+
+Grant role:
+
+gcloud projects add-iam-policy-binding data-engineering-479617 
+--member="serviceAccount:data-engineering-479617@appspot.gserviceaccount.com" 
+--role="roles/pubsub.publisher"
+
+IMPORTANT:
+After changing IAM, always redeploy Cloud Run.
+
+==================================================
+
+STEP 6: Test Cloud Run Manually (curl)
+
+Use the EXACT Cloud Run URL:
+
+curl -X POST [https://firestore-to-pubsub-277069041958.us-central1.run.app](https://firestore-to-pubsub-277069041958.us-central1.run.app) 
+-H "Content-Type: application/json" 
+-d '{
+"reporter_id": "deployment-test",
+"issue": "Manual API test",
+"priority": "P2"
+}'
+
+Check logs:
+
+gcloud run services logs read firestore-to-pubsub 
+--region us-central1 
+--limit 50
+
+==================================================
+
+STEP 7: Verify Pub/Sub Receives Messages
+
+Pull from subscription:
+
+gcloud pubsub subscriptions pull issues-debug-sub --limit=5
+
+If empty:
+
+* Verify correct Cloud Run URL
+* Verify IAM
+* Verify Cloud Run logs show publish
+
+==================================================
+
+STEP 8: Create BigQuery Dataset and Table
+
+Create dataset:
+
+bq mk --location=US issues_ds
+
+Create table (flat schema required for Dataflow template):
+
+bq mk 
+--table data-engineering-479617:issues_ds.issues_stream 
+issue_id:STRING,source:STRING,created_at:STRING,payload:STRING
+
+==================================================
+
+STEP 9: Run Dataflow Streaming Job
+
+Use Google-provided template.
+
+Run job:
+
+gcloud dataflow jobs run issues-pubsub-to-bq 
+--gcs-location gs://dataflow-templates/latest/PubSub_to_BigQuery 
+--region us-central1 
+--parameters 
+inputTopic=projects/data-engineering-479617/topics/issues-topic,
+outputTableSpec=data-engineering-479617:issues_ds.issues_stream
+
+Verify job:
+
+gcloud dataflow jobs list --region us-central1
+
+Describe job:
+
+gcloud dataflow jobs describe <JOB_ID> --region us-central1
+
+Expected state:
+JOB_STATE_RUNNING
+
+IMPORTANT:
+Streaming jobs stay RUNNING permanently.
+
+==================================================
+
+STEP 10: End-to-End Test (Cloud Run → BigQuery)
+
+Send API request again:
+
+curl -X POST [https://firestore-to-pubsub-277069041958.us-central1.run.app](https://firestore-to-pubsub-277069041958.us-central1.run.app) 
+-H "Content-Type: application/json" 
+-d '{
+"reporter_id": "deployment-test",
+"issue": "End-to-end streaming test",
+"priority": "P1"
+}'
+
+Wait 5–10 seconds.
+
+Query BigQuery:
+
+bq query --use_legacy_sql=false '
+SELECT *
+FROM `data-engineering-479617.issues_ds.issues_stream`
+ORDER BY created_at DESC
+LIMIT 10
+'
+
+==================================================
+
+STEP 11: Eventarc Setup (Firestore → Cloud Run)
+
+Create Eventarc trigger:
+
+gcloud eventarc triggers create firestore-issues-trigger 
+--location=nam5 
+--destination-run-service=firestore-to-pubsub 
+--destination-run-region=us-central1 
+--event-filters="type=google.cloud.firestore.document.v1.written" 
+--event-filters="database=(default)" 
+--event-filters-path-pattern="document=projects/data-engineering-479617/databases/(default)/documents/issues/{docId}" 
+--event-data-content-type=application/protobuf 
+--service-account=[data-engineering-479617@appspot.gserviceaccount.com](mailto:data-engineering-479617@appspot.gserviceaccount.com)
+
+Verify trigger:
+
+gcloud eventarc triggers list --location=nam5
+
+==================================================
+
+STEP 12: Test Firestore → BigQuery
+
+Create Firestore document using:
+
+* Firestore Console OR
+* Python SDK OR
+* REST API
+
+Then check:
+
+* Cloud Run logs
+* BigQuery table
+
+==================================================
+
+KEY TROUBLESHOOTING LEARNINGS
+
+1. Wrong Cloud Run URL = no logs, no Pub/Sub messages
+2. Dataflow template requires flat JSON only
+3. Nested JSON causes silent BigQuery drops
+4. IAM changes require Cloud Run redeploy
+5. Streaming Dataflow jobs never finish
+6. Eventarc requires protobuf content type
+7. Gunicorn requires `app = Flask(__name__)`
+
+==================================================
+
+FINAL STATUS
+
+Cloud Run           : Working
+Pub/Sub             : Working
+Dataflow Streaming  : Running
+BigQuery Streaming  : Working
+Eventarc            : Working
+
+Pipeline Status     : PRODUCTION READY
+
+==================================================
+
+END OF LEARNING DOCUMENT
+
+==================================================
+
+
