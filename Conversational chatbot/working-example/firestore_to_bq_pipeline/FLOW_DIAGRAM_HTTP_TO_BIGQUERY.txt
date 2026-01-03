@@ -1,0 +1,258 @@
+
+
+---
+
+# Issue Management API – End-to-End Flow Diagram
+
+This document describes the **single, authoritative execution flow** for the Issue Management system, from request ingestion to analytics storage.
+
+The flow is valid for:
+
+* curl / UI / frontend
+* Vertex AI Conversational Agents
+* Firestore-triggered events
+
+---
+
+## High-Level Flow
+
+```
+┌──────────────┐
+│  Client / UI │
+│  curl / Bot  │
+└──────┬───────┘
+       │  HTTP POST
+       ▼
+┌────────────────────────────┐
+│ Cloud Functions Gen2       │
+│ submit_issue()             │
+│ (HTTP Entry Point)         │
+└────────┬───────────────────┘
+         │
+         │ 1. Validate input
+         │ 2. Generate issue_id
+         │ 3. Compute SLA
+         │
+         ▼
+┌────────────────────────────┐
+│ Firestore (Native Mode)    │
+│ Collection: issues         │
+│ Collection: users          │
+└────────┬───────────────────┘
+         │
+         │ Operational storage
+         │ (source of truth)
+         │
+         ▼
+┌────────────────────────────┐
+│ Pub/Sub                    │
+│ Topic: issues-topic        │
+│ (Analytics Contract)       │
+└────────┬───────────────────┘
+         │
+         │ Flat JSON message
+         │ (schema-aligned)
+         │
+         ▼
+┌────────────────────────────┐
+│ Dataflow (Streaming)       │
+│ Template:                 │
+│ PubSub_to_BigQuery         │
+└────────┬───────────────────┘
+         │
+         │ Streaming inserts
+         │
+         ▼
+┌────────────────────────────┐
+│ BigQuery                   │
+│ Dataset: issues_ds         │
+│ Table: issues_stream       │
+└────────────────────────────┘
+```
+
+---
+
+## Step-by-Step Execution Details
+
+### 1. Client Request
+
+Clients send an HTTP POST request:
+
+```json
+{
+  "reporter_id": "test-user",
+  "issue": "Pipeline setup test",
+  "priority": "P2"
+}
+```
+
+Sources may include:
+
+* curl
+* Web UI
+* Microsoft Teams
+* Vertex AI Conversational Agents
+
+---
+
+### 2. Cloud Functions Gen2 – `submit_issue`
+
+Responsibilities:
+
+* Input validation
+* SLA calculation
+* Issue ID generation
+* Firestore persistence
+* Pub/Sub publishing
+* Gemini response generation
+* Always return HTTP 200
+
+Key guarantees:
+
+* No uncaught exceptions
+* Valid JSON response
+* Agent-safe behavior
+
+---
+
+### 3. Firestore (Operational Storage)
+
+Collections:
+
+* `issues` – primary operational data
+* `users` – reporter metadata
+
+Firestore acts as:
+
+* System of record
+* Trigger source for PATH-A (Eventarc)
+
+---
+
+### 4. Pub/Sub (Analytics Boundary)
+
+Topic:
+
+```
+issues-topic
+```
+
+Message contract (flat schema):
+
+```json
+{
+  "issue_id": "INC-XXXXXXX",
+  "source": "manual-api",
+  "created_at": "2026-01-03T10:15:30Z",
+  "payload": "{...original request...}"
+}
+```
+
+Purpose:
+
+* Decouple operational writes from analytics
+* Enforce schema discipline
+* Enable replay and debugging
+
+---
+
+### 5. Dataflow (Streaming)
+
+Template:
+
+```
+PubSub_to_BigQuery
+```
+
+Responsibilities:
+
+* Read from Pub/Sub
+* Validate message structure
+* Stream rows into BigQuery
+
+Notes:
+
+* Job remains in RUNNING state
+* Does not terminate
+* Drops invalid records silently
+
+---
+
+### 6. BigQuery (Analytics Layer)
+
+Dataset:
+
+```
+issues_ds
+```
+
+Table:
+
+```
+issues_stream
+```
+
+Schema:
+
+```
+issue_id     STRING
+source       STRING
+created_at   STRING
+payload      STRING
+```
+
+Purpose:
+
+* Reporting
+* Dashboards
+* SLA analysis
+* Historical analytics
+
+---
+
+## Alternative Path – Firestore Trigger (PATH A)
+
+```
+Firestore write
+   ↓
+Eventarc
+   ↓
+Cloud Functions Gen2
+   ↓
+Pub/Sub → Dataflow → BigQuery
+```
+
+Both HTTP and Firestore paths converge at **Pub/Sub**, ensuring a **single analytics pipeline**.
+
+---
+
+## Key Design Principles
+
+* **Operational vs Analytical separation**
+* **Flat, schema-aligned Pub/Sub messages**
+* **Streaming-first architecture**
+* **Revision-safe deployment**
+* **Explicit publish responsibility in HTTP path**
+
+---
+
+## Final Summary
+
+This flow ensures:
+
+* Reliable ingestion from multiple clients
+* Decoupled analytics pipeline
+* Safe AI-agent integration
+* Predictable BigQuery ingestion
+
+Any failure must be diagnosed **in order**:
+
+```
+HTTP → Pub/Sub → Dataflow → BigQuery
+```
+
+---
+
+**End of Document**
+
+
