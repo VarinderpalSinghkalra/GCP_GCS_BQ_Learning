@@ -1,0 +1,312 @@
+
+# Testing Guide
+
+## Issue Management API → BigQuery (End-to-End)
+
+This document provides **line-by-line testing steps** to validate the complete pipeline:
+
+```
+HTTP API (curl)
+→ Cloud Functions Gen2
+→ Firestore
+→ Pub/Sub
+→ Dataflow (Streaming)
+→ BigQuery
+```
+
+All commands must be executed in **Google Cloud Shell** or a terminal with `gcloud` configured.
+
+---
+
+## Prerequisites
+
+Ensure the following are already created:
+
+* Cloud Function Gen2 deployed (`submit_issue`)
+* Pub/Sub topic: `issues-topic`
+* Pub/Sub subscription: `issues-debug-sub`
+* Dataflow streaming job: RUNNING
+* BigQuery dataset: `issues_ds`
+* BigQuery table: `issues_stream`
+
+Project used in examples:
+
+```
+PROJECT_ID=data-engineering-479617
+REGION=us-central1
+```
+
+---
+
+## STEP 1 — Verify Active Project
+
+```bash
+gcloud config get-value project
+```
+
+Expected:
+
+```
+data-engineering-479617
+```
+
+---
+
+## STEP 2 — Verify Cloud Function Exists (Gen2)
+
+```bash
+gcloud functions list --gen2 --region us-central1
+```
+
+Confirm function:
+
+```
+submit_issue
+```
+
+---
+
+## STEP 3 — Verify Underlying Cloud Run Service Is Healthy
+
+```bash
+gcloud run services list --region us-central1
+```
+
+Expected:
+
+* Service corresponding to `submit_issue`
+* Status: READY
+
+---
+
+## STEP 4 — Verify Dataflow Streaming Job Is RUNNING
+
+```bash
+gcloud dataflow jobs list --region us-central1
+```
+
+Expected state:
+
+```
+JOB_STATE_RUNNING
+```
+
+---
+
+## STEP 5 — Verify Pub/Sub Topic Exists
+
+```bash
+gcloud pubsub topics list | grep issues-topic
+```
+
+---
+
+## STEP 6 — Verify Pub/Sub Subscription Exists
+
+```bash
+gcloud pubsub subscriptions list | grep issues-debug-sub
+```
+
+---
+
+## STEP 7 — Baseline Pub/Sub Test (Bypass API)
+
+This confirms Pub/Sub + subscription are healthy.
+
+```bash
+gcloud pubsub topics publish issues-topic \
+  --message='{"health":"direct-pubsub-test"}'
+```
+
+Then pull:
+
+```bash
+gcloud pubsub subscriptions pull issues-debug-sub --auto-ack --limit=5
+```
+
+Expected output:
+
+```json
+DATA: {"health":"direct-pubsub-test"}
+```
+
+---
+
+## STEP 8 — API Test Using curl (Primary Test)
+
+This tests **HTTP → Pub/Sub → Dataflow → BigQuery**.
+
+```bash
+curl -X POST https://submit-issue-277069041958.us-central1.run.app \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "test-user",
+    "issue": "TEST-PIPELINE-001",
+    "priority": "P2"
+  }'
+```
+
+Expected response:
+
+```json
+{
+  "issue_id": "INC-XXXXXXX",
+  "status": "created",
+  "assistant_reply": "..."
+}
+```
+
+---
+
+## STEP 9 — Verify Pub/Sub Received API Message
+
+```bash
+gcloud pubsub subscriptions pull issues-debug-sub --auto-ack --limit=5
+```
+
+Expected payload structure:
+
+```json
+{
+  "issue_id": "INC-XXXXXXX",
+  "source": "manual-api",
+  "created_at": "...",
+  "payload": "{\"reporter_id\":\"test-user\",\"issue\":\"TEST-PIPELINE-001\",\"priority\":\"P2\"}"
+}
+```
+
+---
+
+## STEP 10 — Wait for Streaming Propagation
+
+Wait **30–60 seconds** to allow Dataflow to ingest.
+
+---
+
+## STEP 11 — Verify BigQuery Ingestion
+
+```bash
+bq query --use_legacy_sql=false '
+SELECT *
+FROM `data-engineering-479617.issues_ds.issues_stream`
+ORDER BY created_at DESC
+LIMIT 5
+'
+```
+
+Expected:
+
+* A row containing `"TEST-PIPELINE-001"` in the `payload` column
+
+---
+
+## STEP 12 — Firestore PATH A Test (Optional)
+
+This tests **Firestore → Eventarc → Pub/Sub**.
+
+### Get access token
+
+```bash
+TOKEN=$(gcloud auth print-access-token)
+```
+
+### Create Firestore document using curl
+
+```bash
+curl -X POST \
+  "https://firestore.googleapis.com/v1/projects/data-engineering-479617/databases/(default)/documents/issues" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fields": {
+      "reporter_id": { "stringValue": "firestore-test" },
+      "issue": { "stringValue": "PATH-A-FIRESTORE-TEST-001" },
+      "priority": { "stringValue": "P1" }
+    }
+  }'
+```
+
+---
+
+## STEP 13 — Verify Pub/Sub for Firestore Path
+
+```bash
+gcloud pubsub subscriptions pull issues-debug-sub --auto-ack --limit=5
+```
+
+Expected:
+
+* Message with `source=firestore`
+* Payload contains `PATH-A-FIRESTORE-TEST-001`
+
+---
+
+## STEP 14 — Verify BigQuery for Firestore Path
+
+```bash
+bq query --use_legacy_sql=false '
+SELECT *
+FROM `data-engineering-479617.issues_ds.issues_stream`
+ORDER BY created_at DESC
+LIMIT 5
+'
+```
+
+---
+
+## STEP 15 — Cloud Run / Function Logs (Debug)
+
+If any step fails:
+
+```bash
+gcloud run services logs read submit-issue \
+  --region us-central1 \
+  --limit 50
+```
+
+Look for:
+
+* Startup errors
+* Pub/Sub publish errors
+* Permission errors
+
+---
+
+## Common Failure Diagnosis
+
+| Symptom                             | Likely Cause                               |
+| ----------------------------------- | ------------------------------------------ |
+| curl returns 200, Pub/Sub empty     | HTTP path not publishing                   |
+| Pub/Sub has data, BigQuery empty    | Dataflow stopped or schema mismatch        |
+| 503 Service Unavailable             | Wrong deploy command or missing dependency |
+| Old messages only                   | Subscription backlog                       |
+| Firestore path works, HTTP does not | Missing publish in HTTP handler            |
+
+---
+
+## Success Criteria
+
+Pipeline is considered **SUCCESSFUL** when:
+
+* curl → Pub/Sub message visible
+* Pub/Sub → BigQuery row visible
+* Dataflow job remains RUNNING
+* No Cloud Run startup errors
+
+---
+
+## Final Note
+
+Always validate in this order:
+
+```
+API → Pub/Sub → Dataflow → BigQuery
+```
+
+Never start debugging from BigQuery.
+
+---
+
+**End of Testing Guide**
+
+
