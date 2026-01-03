@@ -18,21 +18,22 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from google.cloud import firestore
+from google.cloud import pubsub_v1
 import google.genai as genai
-
 
 
 # =====================================================
 # Configuration
 # =====================================================
-PROJECT_ID: str = os.getenv(
-    "GOOGLE_CLOUD_PROJECT", "data-engineering-479617")
+PROJECT_ID: str = os.getenv("GOOGLE_CLOUD_PROJECT", "data-engineering-479617")
 LOCATION: str = os.getenv("GCP_LOCATION", "us-central1")
 
 GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 ISSUES_COL: str = os.getenv("ISSUES_COL", "issues")
 USERS_COL: str = os.getenv("USERS_COL", "users")
+
+PUBSUB_TOPIC: str = os.getenv("PUBSUB_TOPIC", "issues-topic")
 
 SLA_POLICY: Dict[str, Dict[str, int]] = {
     "P1": {"response_mins": 15, "resolve_mins": 240},
@@ -41,7 +42,10 @@ SLA_POLICY: Dict[str, Dict[str, int]] = {
     "P4": {"response_mins": 480, "resolve_mins": 10080},
 }
 
+# Clients
 db = firestore.Client(project=PROJECT_ID)
+publisher = pubsub_v1.PublisherClient()
+topic_path = publisher.topic_path(PROJECT_ID, PUBSUB_TOPIC)
 
 
 # =====================================================
@@ -53,7 +57,6 @@ def utc_now() -> datetime:
 
 
 def compute_sla(priority: str) -> Dict[str, Any]:
-    """Compute SLA deadlines based on priority."""
     policy = SLA_POLICY.get(priority, SLA_POLICY["P3"])
     now = utc_now()
 
@@ -79,7 +82,6 @@ def json_response(payload: Dict[str, Any]):
 
 
 def vertex_client() -> genai.Client:
-    """Create Vertex AI Gemini client."""
     return genai.Client(
         vertexai=True,
         project=PROJECT_ID,
@@ -88,7 +90,6 @@ def vertex_client() -> genai.Client:
 
 
 def gemini_reply(issue_text: str) -> str:
-    """Generate a safe Gemini response."""
     try:
         client = vertex_client()
         response = client.models.generate_content(
@@ -106,7 +107,6 @@ def gemini_reply(issue_text: str) -> str:
 
 
 def upsert_user(reporter_id: str) -> None:
-    """Create or update a user record."""
     db.collection(USERS_COL).document(reporter_id).set(
         {
             "last_seen_at": firestore.SERVER_TIMESTAMP,
@@ -121,7 +121,6 @@ def create_issue(
     issue_text: str,
     priority: str,
 ) -> str:
-    """Create a new issue document."""
     issue_id = f"INC-{uuid.uuid4().hex[:8].upper()}"
 
     db.collection(ISSUES_COL).document(issue_id).set(
@@ -137,6 +136,25 @@ def create_issue(
     )
 
     return issue_id
+
+
+def publish_issue_event(issue_id: str, body: Dict[str, Any]) -> None:
+    """
+    Publish a flat, BigQuery-compatible message to Pub/Sub.
+    This restores yesterday-style curl testing.
+    """
+    message = {
+        "issue_id": issue_id,
+        "source": "manual-api",
+        "created_at": utc_now().isoformat() + "Z",
+        "payload": json.dumps(body),
+    }
+
+    future = publisher.publish(
+        topic_path,
+        json.dumps(message).encode("utf-8"),
+    )
+    future.result()  # 🔥 critical: ensure publish completes
 
 
 # =====================================================
@@ -171,8 +189,14 @@ def submit_issue(request):
                 }
             )
 
+        # Firestore
         upsert_user(reporter_id)
         issue_id = create_issue(reporter_id, issue_text, priority)
+
+        # 🔥 Pub/Sub (restores yesterday behavior)
+        publish_issue_event(issue_id, body)
+
+        # Gemini (non-blocking for pipeline)
         assistant_reply = gemini_reply(issue_text)
 
         return json_response(
