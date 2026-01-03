@@ -1,0 +1,260 @@
+
+# Issue Management API – HTTP to BigQuery Pipeline
+
+## Debugging & Deployment Learnings (Day Log)
+
+---
+
+## Context
+
+The objective was to build and test a **real-time ingestion pipeline** using:
+
+```
+HTTP API (curl / UI / Agents)
+→ Cloud Functions Gen2
+→ Pub/Sub
+→ Dataflow (Streaming)
+→ BigQuery
+```
+
+The API is designed to be:
+
+* Agent-safe (Vertex AI / Conversational Agents compatible)
+* Always return HTTP 200
+* Never crash on downstream failures
+* Support both Firestore persistence and analytics ingestion
+
+---
+
+## What Was Working Earlier
+
+On the previous day:
+
+* The same `curl` request successfully triggered data flow into BigQuery.
+* Pub/Sub messages were visible.
+* Dataflow streaming job was ingesting correctly.
+
+Example test:
+
+```bash
+curl -X POST https://submit-issue-<hash>.us-central1.run.app \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "test-user",
+    "issue": "Pipeline setup test",
+    "priority": "P2"
+  }'
+```
+
+---
+
+## What Broke Today
+
+The same `curl` request:
+
+* Returned HTTP 200
+* Generated an issue ID
+* Produced a Gemini assistant response
+* **Did NOT push any data to Pub/Sub**
+* Resulted in **no new BigQuery records**
+
+Later, after code changes, the API started returning:
+
+```
+503 Service Unavailable
+```
+
+---
+
+## Key Findings
+
+### 1. Pub/Sub, Dataflow, and BigQuery Were Never the Problem
+
+Direct publishing worked:
+
+```bash
+gcloud pubsub topics publish issues-topic \
+  --message='{"health":"direct-pubsub-test"}'
+```
+
+Messages were visible via subscription pull, proving:
+
+* Pub/Sub was healthy
+* IAM was correct
+* Dataflow was running
+* BigQuery schema was valid
+
+---
+
+### 2. Two Execution Paths Existed in the Same Service
+
+The API had **two logical paths**:
+
+* **PATH A**: Firestore / Eventarc triggered execution
+* **PATH B**: HTTP (`curl`) execution
+
+Only **PATH A** was publishing to Pub/Sub.
+
+The HTTP path:
+
+* Created Firestore records
+* Returned responses
+* **Never published to Pub/Sub**
+
+This explained why:
+
+* Yesterday’s tests worked (different revision / path)
+* Today’s HTTP tests silently stopped analytics ingestion
+
+---
+
+### 3. Cloud Run vs Cloud Functions Gen2 Confusion
+
+The service `submit-issue` was originally deployed as:
+
+```
+Cloud Functions Gen2
+```
+
+After code changes, it was redeployed using:
+
+```bash
+gcloud run deploy
+```
+
+This caused:
+
+* Container startup failure
+* `503 Service Unavailable`
+* Because Cloud Functions Gen2 expects a function entry point, not a web server
+
+**Cloud Functions Gen2 runs on Cloud Run, but must be deployed using `gcloud functions deploy --gen2`.**
+
+---
+
+## Correct Fix Implemented
+
+### 1. Pub/Sub Publishing Was Restored in HTTP Path
+
+A Pub/Sub publish step was added **after issue creation**:
+
+* Ensured flat, BigQuery-compatible schema
+* Ensured `future.result()` is called
+* Ensured HTTP, Firestore, and future integrations behave consistently
+
+This restored yesterday-style testing.
+
+---
+
+### 2. Deployment Method Was Corrected
+
+Instead of `gcloud run deploy`, the service must be deployed as:
+
+```bash
+gcloud functions deploy submit_issue \
+  --gen2 \
+  --runtime python311 \
+  --region us-central1 \
+  --source . \
+  --entry-point submit_issue \
+  --trigger-http \
+  --service-account <project-id>@appspot.gserviceaccount.com \
+  --allow-unauthenticated
+```
+
+This correctly wires:
+
+* The HTTP handler
+* The Cloud Run backend
+* IAM and invocation model
+
+---
+
+### 3. Dependency Management
+
+Because Pub/Sub was introduced, the following dependency is required:
+
+```txt
+google-cloud-pubsub
+```
+
+Missing this causes Cloud Run / Functions Gen2 startup failures.
+
+---
+
+## Final Correct Architecture
+
+```
+curl / UI / Vertex Agent
+        ↓
+Cloud Functions Gen2 (submit_issue)
+        ↓
+Firestore (operational storage)
+        ↓
+Pub/Sub (analytics contract)
+        ↓
+Dataflow (streaming)
+        ↓
+BigQuery (reporting / dashboards)
+```
+
+---
+
+## Testing Strategy (Validated)
+
+### API Test (HTTP Path)
+
+```bash
+curl -X POST https://submit-issue-<hash>.us-central1.run.app \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "test-user",
+    "issue": "FINAL-WORKING-TEST",
+    "priority": "P2"
+  }'
+```
+
+### Pub/Sub Validation
+
+```bash
+gcloud pubsub subscriptions pull issues-debug-sub --auto-ack --limit=5
+```
+
+### BigQuery Validation
+
+```sql
+SELECT *
+FROM `project_id.issues_ds.issues_stream`
+ORDER BY created_at DESC
+LIMIT 5;
+```
+
+---
+
+## Key Learnings
+
+1. **Cloud Functions Gen2 and Cloud Run are not interchangeable at deploy time**
+2. **HTTP APIs must explicitly publish to Pub/Sub if analytics is expected**
+3. **Returning HTTP 200 does not imply downstream success**
+4. **Pub/Sub debug subscriptions can mislead due to backlog**
+5. **Revision-based platforms can silently change behavior**
+6. **Always verify ingestion at Pub/Sub before checking BigQuery**
+
+---
+
+## Final Takeaway
+
+> The system was architecturally correct from the beginning.
+> The issue was caused by a missing publish step in the HTTP path and an incorrect deployment method.
+
+This debugging session reinforced the importance of:
+
+* Clear execution-path separation
+* Deployment-model awareness
+* Contract-driven data pipelines
+
+---
+
+**End of Document**
+
+
