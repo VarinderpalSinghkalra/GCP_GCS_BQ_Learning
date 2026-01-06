@@ -1,0 +1,2 @@
+chmod +x setup_vertex_agent_prereqs_with_checks.sh
+./setup_vertex_agent_prereqs_with_checks.sh
