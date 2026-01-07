@@ -1,0 +1,4 @@
+flask
+google-cloud-bigquery
+sqlglot
+google-cloud-aiplatform
