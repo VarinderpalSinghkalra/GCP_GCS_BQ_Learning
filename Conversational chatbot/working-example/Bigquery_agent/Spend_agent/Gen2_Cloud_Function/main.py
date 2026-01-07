@@ -282,7 +282,7 @@ def ask_agent(question: str) -> Dict[str, Any]:
     validate_sql_ast(sql)
     rows = run_query_cached(sql)
 
-    # 🔥 Async Gemini (never blocks)
+    #  Async Gemini (never blocks)
     threading.Thread(
         target=run_gemini_async,
         args=(question, sql),
