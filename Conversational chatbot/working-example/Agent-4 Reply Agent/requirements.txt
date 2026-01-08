@@ -1,0 +1,4 @@
+google-cloud-firestore>=2.11.0
+google-cloud-pubsub>=2.21.0
+google-cloud-tasks>=2.16.0
+google-genai>=0.3.0
