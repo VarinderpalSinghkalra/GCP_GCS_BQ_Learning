@@ -91,8 +91,7 @@ def gemini_reply(issue_text: str) -> str:
             contents=f"Acknowledge the issue briefly:\n{issue_text}",
         )
         return (resp.text or "").strip() or "Your issue has been logged."
-    except Exception as e:
-        print("Gemini skipped:", e)
+    except Exception:
         return "Your issue has been logged."
 
 
@@ -147,15 +146,31 @@ def create_issue(
 
 
 # =====================================================
-# Pub/Sub
+# Pub/Sub (BQ-SCHEMA COMPATIBLE)
 # =====================================================
-def publish_issue_event(issue_id: str, body: Dict[str, Any]):
+def publish_issue_event(
+    issue_id: str,
+    old_status: str | None,
+    new_status: str,
+    priority: str,
+    source: str,
+):
+    """
+    EXACT MATCH to BigQuery issues_status_history schema
+    """
     message = {
         "issue_id": issue_id,
-        "created_at": utc_now().isoformat() + "Z",
-        "payload": json.dumps(body),
+        "old_status": old_status,
+        "new_status": new_status,
+        "priority": priority,
+        "source": source,
+        "changed_at": utc_now().isoformat() + "Z",
     }
-    publisher.publish(topic_path, json.dumps(message).encode()).result()
+
+    publisher.publish(
+        topic_path,
+        json.dumps(message).encode("utf-8")
+    ).result()
 
 
 # =====================================================
@@ -185,23 +200,9 @@ def schedule_status_flow(issue_id: str):
     """
     base_url = f"https://{LOCATION}-{PROJECT_ID}.cloudfunctions.net/update_issue_status"
 
-    schedule_task(
-        base_url,
-        {"issue_id": issue_id, "status": "assigned"},
-        utc_now() + timedelta(minutes=5),
-    )
-
-    schedule_task(
-        base_url,
-        {"issue_id": issue_id, "status": "in_progress"},
-        utc_now() + timedelta(minutes=7),
-    )
-
-    schedule_task(
-        base_url,
-        {"issue_id": issue_id, "status": "completed"},
-        utc_now() + timedelta(minutes=12),
-    )
+    schedule_task(base_url, {"issue_id": issue_id, "status": "assigned"}, utc_now() + timedelta(minutes=5))
+    schedule_task(base_url, {"issue_id": issue_id, "status": "in_progress"}, utc_now() + timedelta(minutes=7))
+    schedule_task(base_url, {"issue_id": issue_id, "status": "completed"}, utc_now() + timedelta(minutes=12))
 
 
 # =====================================================
@@ -220,11 +221,17 @@ def submit_issue(request):
 
         upsert_user(reporter_id)
 
-        issue_id, sla = create_issue(reporter_id, issue_text, priority)
+        issue_id, _ = create_issue(reporter_id, issue_text, priority)
 
-        publish_issue_event(issue_id, body)
+        #  INITIAL EVENT (new)
+        publish_issue_event(
+            issue_id=issue_id,
+            old_status=None,
+            new_status="new",
+            priority=priority,
+            source="submit_issue",
+        )
 
-        #  AUTOMATIC STATUS UPDATES
         schedule_status_flow(issue_id)
 
         return json_response(
@@ -243,13 +250,30 @@ def submit_issue(request):
 def update_issue_status(request):
     try:
         body = request.get_json()
-        db.collection(ISSUES_COL).document(body["issue_id"]).update(
+
+        issue_ref = db.collection(ISSUES_COL).document(body["issue_id"])
+        snap = issue_ref.get()
+
+        old_status = snap.get("status")
+
+        issue_ref.update(
             {
                 "status": body["status"],
                 "updated_at": firestore.SERVER_TIMESTAMP,
             }
         )
+
+        #  LIFECYCLE EVENT
+        publish_issue_event(
+            issue_id=body["issue_id"],
+            old_status=old_status,
+            new_status=body["status"],
+            priority=snap.get("priority"),
+            source="cloud_tasks",
+        )
+
         return json_response({"ok": True})
+
     except Exception:
         traceback.print_exc()
         return json_response({"ok": False})
