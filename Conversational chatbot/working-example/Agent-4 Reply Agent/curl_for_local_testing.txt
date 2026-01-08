@@ -1,0 +1,8 @@
+curl -i -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/submit_issue \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reporter_id": "user123",
+    "issue": "Unable to login to the dashboard",
+    "priority": "P2"
+  }'
