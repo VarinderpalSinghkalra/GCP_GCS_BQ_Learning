@@ -1,0 +1,1 @@
+gcloud dataflow jobs run issues-pubsub-to-bq   --region us-central1   --gcs-location gs://dataflow-templates-us-central1/latest/PubSub_to_BigQuery   --parameters inputTopic=projects/data-engineering-479617/topics/issues-topic,outputTableSpec=data-engineering-479617:issues_ds.issues_status_history
