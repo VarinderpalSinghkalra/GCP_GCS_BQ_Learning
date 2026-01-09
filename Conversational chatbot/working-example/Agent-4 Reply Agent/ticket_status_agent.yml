@@ -1,0 +1,46 @@
+openapi: 3.0.0
+
+info:
+  title: Issue Status API
+  version: "1.0.0"
+  description: >
+    Read-only Issue Status API for Conversational Agents.
+    Used to fetch real-time ticket lifecycle status.
+
+servers:
+  - url: https://get-issue-status-277069041958.us-central1.run.app
+    description: Issue Status Service
+
+paths:
+  /status:
+    get:
+      summary: Get current issue status
+      operationId: getIssueStatus
+      parameters:
+        - name: issue_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Issue identifier
+      responses:
+        "200":
+          description: Current issue status
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - issue_id
+                  - current_status
+                properties:
+                  issue_id:
+                    type: string
+                  current_status:
+                    type: string
+                    enum: [new, assigned, in_progress, completed]
+                  priority:
+                    type: string
+                  last_updated_at:
+                    type: string
+                    format: date-time
