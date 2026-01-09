@@ -1,0 +1,28 @@
+gcloud functions deploy submit_issue \
+  --gen2
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --region us-central1 \
+  --entry-point submit_issue \
+  --timeout 540s
+
+
+gcloud functions deploy update_issue_status \
+  --gen2
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --region us-central1 \
+  --entry-point update_issue_status \
+  --timeout 540s
+
+gcloud functions deploy get_issue_status \
+  --gen2
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --region us-central1 \
+  --entry-point get_issue_status \
+  --timeout 540s
+
