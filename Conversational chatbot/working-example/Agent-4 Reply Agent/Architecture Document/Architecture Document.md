@@ -1,4 +1,4 @@
-## Issue Management & Spend Analytics – Multi-Agent Platform (GCP
+## Issue Management & Spend Analytics – Multi-Agent Platform (GCP)
 
 ---
 
