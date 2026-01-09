@@ -1,3 +1,8 @@
+gcloud tasks queues create issue-status-queue \
+  --location us-central1
+
+
+
 gcloud functions deploy submit_issue \
   --gen2
   --runtime python311 \
