@@ -110,7 +110,7 @@ def compute_sla(priority: str) -> Dict[str, Any]:
 
 
 # =====================================================
-# Firestore
+# Firestore helpers
 # =====================================================
 def upsert_user(reporter_id: str):
     db.collection(USERS_COL).document(reporter_id).set(
@@ -146,7 +146,7 @@ def create_issue(
 
 
 # =====================================================
-# Pub/Sub (BQ-SCHEMA COMPATIBLE)
+# Pub/Sub (BQ schema aligned)
 # =====================================================
 def publish_issue_event(
     issue_id: str,
@@ -155,9 +155,6 @@ def publish_issue_event(
     priority: str,
     source: str,
 ):
-    """
-    EXACT MATCH to BigQuery issues_status_history schema
-    """
     message = {
         "issue_id": issue_id,
         "old_status": old_status,
@@ -174,7 +171,7 @@ def publish_issue_event(
 
 
 # =====================================================
-# Cloud Tasks (time-based automation)
+# Cloud Tasks (lifecycle automation)
 # =====================================================
 def schedule_task(url: str, payload: Dict[str, Any], run_at: datetime):
     ts = timestamp_pb2.Timestamp()
@@ -223,7 +220,7 @@ def submit_issue(request):
 
         issue_id, _ = create_issue(reporter_id, issue_text, priority)
 
-        #  INITIAL EVENT (new)
+        # Initial lifecycle event
         publish_issue_event(
             issue_id=issue_id,
             old_status=None,
@@ -234,13 +231,11 @@ def submit_issue(request):
 
         schedule_status_flow(issue_id)
 
-        return json_response(
-            {
-                "issue_id": issue_id,
-                "status": "created",
-                "assistant_reply": gemini_reply(issue_text),
-            }
-        )
+        return json_response({
+            "issue_id": issue_id,
+            "status": "created",
+            "assistant_reply": gemini_reply(issue_text),
+        })
 
     except Exception:
         traceback.print_exc()
@@ -263,7 +258,6 @@ def update_issue_status(request):
             }
         )
 
-        #  LIFECYCLE EVENT
         publish_issue_event(
             issue_id=body["issue_id"],
             old_status=old_status,
@@ -277,3 +271,48 @@ def update_issue_status(request):
     except Exception:
         traceback.print_exc()
         return json_response({"ok": False})
+
+
+def get_issue_status(request):
+    """
+    Agent-friendly API to fetch current issue status
+    """
+    try:
+        issue_id = (
+            request.args.get("issue_id")
+            or (request.get_json(silent=True) or {}).get("issue_id")
+        )
+
+        if not issue_id:
+            return json_response({
+                "status": "failed",
+                "message": "issue_id is required"
+            })
+
+        snap = db.collection(ISSUES_COL).document(issue_id).get()
+
+        if not snap.exists:
+            return json_response({
+                "status": "not_found",
+                "issue_id": issue_id
+            })
+
+        data = snap.to_dict()
+
+        return json_response({
+            "issue_id": issue_id,
+            "current_status": data.get("status"),
+            "priority": data.get("priority"),
+            "last_updated_at": (
+                data.get("updated_at").isoformat()
+                if data.get("updated_at")
+                else None
+            )
+        })
+
+    except Exception:
+        traceback.print_exc()
+        return json_response({
+            "status": "failed",
+            "message": "Unable to fetch issue status"
+        })
