@@ -1,0 +1,143 @@
+Proposal: Enhancing the Issue Management Platform with ADK-Based Intelligent Automation
+
+1. Executive Summary
+
+The current Issue Management Platform has been implemented as a Proof of Concept (POC) to validate a scalable, event-driven architecture on Google Cloud. The POC successfully demonstrates issue intake, automated status lifecycle, SLA enforcement, analytics, and limited AI usage for user-facing acknowledgements.
+
+For the production rollout, this proposal introduces an ADK (Agent Development Kit)–based decision layer to enable impact-aware and context-driven automation. The goal is to move from a uniform automation model to a flexible, intelligent model—while keeping the existing execution, data pipelines, and compliance controls unchanged.
+
+⸻
+
+2. Current State (POC – As Implemented)
+
+Business View
+	•	Issues are created through APIs and acknowledged using AI-generated responses.
+	•	All issues follow the same automation path, regardless of impact.
+	•	Status transitions and SLA checks are time-based and predictable.
+	•	Operational and SLA data is available for reporting and analytics.
+
+Technical View
+	•	Cloud Functions / Cloud Run for APIs
+	•	Firestore as the system of record
+	•	Pub/Sub for event-driven processing
+	•	Cloud Tasks for time-based execution
+	•	Dataflow → BigQuery for analytics
+	•	AI (Gemini) used only for conversational responses
+
+Important Context:
+The uniform automation behavior was a deliberate POC decision to validate architecture, reliability, and integrations before introducing complexity.
+
+⸻
+
+3. Why ADK Is Needed for Production
+
+While the POC proves stability, a production system must reflect real business impact:
+	•	High-impact issues require faster, more aggressive handling.
+	•	Low-impact issues should follow cost-efficient automation paths.
+	•	Business rules evolve faster than code deployments.
+	•	Static rules limit responsiveness and operational efficiency.
+
+ADK addresses these gaps by introducing intelligent decision-making without replacing existing systems.
+
+⸻
+
+4. Proposed Enhancement Using ADK (To-Be State)
+
+What ADK Adds
+
+ADK introduces an AI-driven decision layer that evaluates issue context and decides which automation path to trigger.
+
+ADK considers:
+	•	Issue priority and impact (P1–P4)
+	•	SLA deadlines and urgency
+	•	Current issue status
+	•	Historical patterns and trends
+	•	Operational context (e.g., recurring incidents)
+
+Key Principle:
+
+ADK decides what should happen; existing services still execute what happens.
+
+⸻
+
+5. Updated Architecture with ADK
+
+Issue API
+   ↓
+Firestore + Pub/Sub
+   ↓
+ADK Decision Layer (Cloud Run)
+   ↓
+Existing Automation
+(Cloud Tasks, Status Updates, SLA Checks)
+   ↓
+Dataflow → BigQuery
+
+
+⸻
+
+6. What Will Change
+
+New / Enhanced Components
+	•	ADK Agent Service (Cloud Run)
+	•	Evaluates issue context
+	•	Determines automation strategy
+	•	Decision Invocation Point
+	•	Replaces hardcoded automation triggers with ADK decisions
+	•	Configurable Policies
+	•	Business logic moves from code to agent policies/prompts
+
+⸻
+
+7. What Will NOT Change
+
+To minimize risk and ensure continuity, the following remain unchanged:
+	•	Firestore (system of record)
+	•	Pub/Sub (event backbone)
+	•	Cloud Tasks (deterministic execution)
+	•	Dataflow and BigQuery (analytics)
+	•	Existing APIs and integrations
+	•	Compliance, auditability, and rollback mechanisms
+
+⸻
+
+8. Business Benefits of ADK Integration
+	•	Faster resolution of critical issues
+	•	Improved SLA adherence
+	•	Reduced manual intervention
+	•	Greater flexibility without frequent redeployments
+	•	Better alignment with real business impact
+	•	Future-ready platform for intelligent automation
+
+⸻
+
+9. Risk Management & Governance
+	•	ADK does not directly modify data
+	•	All executions remain deterministic and logged
+	•	Full audit trail is preserved
+	•	Rollback to POC behavior is immediate
+	•	ADK scope can be limited by priority or issue type
+
+⸻
+
+10. Phased Rollout Strategy
+
+Phase 1 – POC (Completed):
+Uniform automation to validate architecture.
+
+Phase 2 – ADK in Shadow Mode:
+ADK evaluates issues but does not trigger actions.
+
+Phase 3 – Controlled Production:
+ADK-driven decisions for high-impact issues only (P1/P2).
+
+Phase 4 – Full Production:
+Impact-aware automation across all issue categories.
+
+⸻
+
+11. Conclusion
+
+The current POC has successfully validated the technical foundation of the Issue Management Platform. Introducing ADK in the production phase allows the system to evolve from static automation to intelligent, impact-aware decision-making, without disrupting existing infrastructure or increasing operational risk. This approach delivers measurable business value while preserving stability, compliance, and scalability.
+
+⸻
