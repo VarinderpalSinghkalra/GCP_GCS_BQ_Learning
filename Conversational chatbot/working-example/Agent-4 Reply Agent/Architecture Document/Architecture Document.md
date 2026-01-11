@@ -1,4 +1,4 @@
-Issue Management & Spend Analytics Platform
+ Issue Management & Spend Analytics Platform
 
 ADK-Enabled Multi-Agent Architecture on Google Cloud Platform
 
