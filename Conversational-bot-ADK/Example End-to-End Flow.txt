@@ -1,22 +1,140 @@
-User :- I cannot log in to the workflow tool
+---
 
-ADK (internally) :- 
+# 🔁 End-to-End Flow
+
+## Incident Creation via ADK (P1 Example)
+
+---
+
+## 1️⃣ User Interaction (Natural Language)
+
+**User Input (Conversation Layer)**
+
+```
+I cannot log in to the workflow tool
+```
+
+At this stage:
+
+* The user has **not provided structured data**
+* The input is **unstructured natural language**
+* No system action has been taken yet
+
+---
+
+## 2️⃣ ADK Internal Reasoning & Tool Invocation
+
+### Intent Detection (ADK – Internal)
+
+The Vertex AI Agent (ADK):
+
+* Detects **incident reporting intent**
+* Extracts key signals:
+
+  * Issue description
+  * Implied urgency (login failure → critical system access issue)
+
+### Priority Resolution
+
+* Agent resolves priority as **P1 (Critical)** based on predefined rules
+* Defaults and guardrails are applied (no hallucination)
+
+---
+
+### ADK → Tool Payload (Internal)
+
+```json
 {
   "reporter_id": "user",
   "issue": "I cannot log in to the workflow tool",
   "priority": "P1"
 }
+```
 
-Tool Response :-
+✅ This payload is:
+
+* Fully validated
+* Deterministic
+* Safe for execution
+* Free from conversational noise
+
+---
+
+## 3️⃣ Tool Execution (Backend Orchestration)
+
+### Tool: `submit_issue_tool`
+
+The Issue Management Tool performs the following steps **atomically**:
+
+1. **Input Validation**
+
+   * Reporter ID present
+   * Issue length valid
+   * Priority normalized to `P1`
+
+2. **SLA Computation**
+
+   * Response SLA: 15 minutes
+   * Resolution SLA: 4 hours
+
+3. **Persistence**
+
+   * Issue stored in Firestore
+   * Status set to `new`
+   * SLA timestamps recorded
+
+4. **Event Emission**
+
+   * Issue creation event published to Pub/Sub
+
+5. **Automation Scheduling**
+
+   * Cloud Tasks scheduled for lifecycle transitions:
+
+     * `assigned`
+     * `in_progress`
+     * `completed`
+
+6. **AI Acknowledgment**
+
+   * Gemini generates a short acknowledgment message
+
+---
+
+### Tool Response (Structured, Machine-Safe)
+
+```json
 {
   "issue_id": "INC-4F91A2BC",
   "status": "created",
   "assistant_reply": "Please try resetting your password..."
 }
+```
 
+✅ Characteristics:
 
-Final User Reply :- 
+* Deterministic JSON
+* No UI formatting
+* No business language
+* Safe for agent consumption
 
+---
+
+## 4️⃣ ADK Response Composition (User-Facing)
+
+The ADK agent:
+
+* **Does not expose raw tool output**
+* Transforms structured data into a **business-friendly response**
+* Applies tone, formatting, and clarity rules from `instructions.md`
+
+---
+
+## 5️⃣ Final User Response (Conversational Output)
+
+**Final Response Shown to User**
+
+```
 Your issue has been logged successfully.
 
 Ticket ID: INC-4F91A2BC
@@ -25,3 +143,35 @@ Priority: P1 (Critical)
 Next steps:
 - Our support team is investigating
 - You will receive updates shortly
+```
+
+✅ This response:
+
+* Is clear and professional
+* Contains only approved information
+* Hides system internals
+* Matches enterprise ITSM communication standards
+
+---
+
+## 6️⃣ What Happens After (Asynchronous – No User Impact)
+
+Behind the scenes (fully automated):
+
+* Cloud Tasks triggers status changes
+* Firestore state updates
+* Pub/Sub events emitted
+* Analytics systems consume events
+* SLA timers continue running
+
+The user **does not need to take any further action**.
+
+---
+
+## Flow Summary 
+
+> A natural language issue is converted by ADK into a structured tool call, safely executed through serverless GCP services, and returned to the user as a professional, business-friendly confirmation — with full automation running asynchronously.
+
+---
+
+
