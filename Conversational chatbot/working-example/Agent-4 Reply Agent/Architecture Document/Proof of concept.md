@@ -1,4 +1,4 @@
- Proof of Concept (POC): ADK-Based Intelligent Decision Layer for Issue Management
+Proof of Concept (POC): ADK-Based Intelligent Decision Layer for Issue Management
 
 ## 1. Purpose of the POC
 
