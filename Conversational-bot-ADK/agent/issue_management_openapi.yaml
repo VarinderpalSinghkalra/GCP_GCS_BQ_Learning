@@ -1,47 +1,159 @@
 openapi: 3.0.0
+
 info:
   title: Issue Management API
-  version: 1.0.0
+  description: >
+    API for creating and tracking support issues.
+    Designed for integration with Vertex AI Agents (ADK),
+    serverless GCP services, and event-driven automation.
+  version: 1.1.0
+
 servers:
-  - url: https://YOUR_CLOUD_RUN_URL   # <-- replace
+  - url: https://YOUR_CLOUD_RUN_URL
+    description: Production endpoint (Cloud Run / Cloud Functions)
 
 paths:
-  /:
+  /submit:
     post:
       operationId: submitIssue
       summary: Create a new support issue
+      description: >
+        Creates a new issue, computes SLA based on priority,
+        triggers automated lifecycle workflows, and returns
+        an AI-generated acknowledgment message.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - reporter_id
-                - issue
-              properties:
-                reporter_id:
-                  type: string
-                issue:
-                  type: string
-                priority:
-                  type: string
-                  enum: [P1, P2, P3, P4]
+              $ref: "#/components/schemas/SubmitIssueRequest"
+            examples:
+              p1Issue:
+                summary: Critical login issue
+                value:
+                  reporter_id: user
+                  issue: I cannot log in to the workflow tool
+                  priority: P1
       responses:
         "200":
-          description: Issue created
+          description: Issue successfully created
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - issue_id
-                  - status
-                  - assistant_reply
-                properties:
-                  issue_id:
-                    type: string
-                  status:
-                    type: string
-                  assistant_reply:
-                    type: string
+                $ref: "#/components/schemas/SubmitIssueResponse"
+              examples:
+                success:
+                  value:
+                    issue_id: INC-4F91A2BC
+                    status: created
+                    assistant_reply: Please try resetting your password.
+        "400":
+          description: Invalid request payload
+        "500":
+          description: Internal error (masked, API always returns 200 in runtime)
+
+  /status:
+    post:
+      operationId: getIssueStatus
+      summary: Get current issue status
+      description: >
+        Returns the current status and priority of an existing issue.
+        Intended for agent-driven or programmatic status checks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetIssueStatusRequest"
+      responses:
+        "200":
+          description: Issue status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetIssueStatusResponse"
+              examples:
+                inProgress:
+                  value:
+                    issue_id: INC-4F91A2BC
+                    current_status: in_progress
+                    priority: P1
+                    last_updated_at: "2026-01-11T10:42:00Z"
+
+components:
+  schemas:
+
+    SubmitIssueRequest:
+      type: object
+      required:
+        - reporter_id
+        - issue
+      properties:
+        reporter_id:
+          type: string
+          description: Unique identifier of the reporter (user or system)
+          example: user
+        issue:
+          type: string
+          description: Description of the problem being reported
+          minLength: 5
+          example: I cannot log in to the workflow tool
+        priority:
+          type: string
+          description: Issue priority (defaults to P3 if not provided)
+          enum: [P1, P2, P3, P4]
+          example: P1
+
+    SubmitIssueResponse:
+      type: object
+      required:
+        - issue_id
+        - status
+        - assistant_reply
+      properties:
+        issue_id:
+          type: string
+          description: System-generated incident identifier
+          example: INC-4F91A2BC
+        status:
+          type: string
+          description: Creation status
+          example: created
+        assistant_reply:
+          type: string
+          description: AI-generated acknowledgment message
+          example: Please try resetting your password.
+
+    GetIssueStatusRequest:
+      type: object
+      required:
+        - issue_id
+      properties:
+        issue_id:
+          type: string
+          description: Incident identifier
+          example: INC-4F91A2BC
+
+    GetIssueStatusResponse:
+      type: object
+      required:
+        - issue_id
+        - current_status
+        - priority
+      properties:
+        issue_id:
+          type: string
+          example: INC-4F91A2BC
+        current_status:
+          type: string
+          description: Current lifecycle status of the issue
+          example: in_progress
+        priority:
+          type: string
+          enum: [P1, P2, P3, P4]
+          example: P1
+        last_updated_at:
+          type: string
+          format: date-time
+          description: Last status update timestamp
+          example: "2026-01-11T10:42:00Z"
