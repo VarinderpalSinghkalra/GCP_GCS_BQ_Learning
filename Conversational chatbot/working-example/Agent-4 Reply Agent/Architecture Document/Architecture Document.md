@@ -1,431 +1,318 @@
-## Issue Management & Spend Analytics – Multi-Agent Platform (GCP)
+Issue Management & Spend Analytics Platform
 
----
+ADK-Enabled Multi-Agent Architecture on Google Cloud Platform
 
-## 1. Executive Summary
+⸻
 
-This document describes the end-to-end architecture of a **serverless, event-driven Issue Management and Spend Analytics platform** built on Google Cloud Platform.
+1. Purpose of This Document
 
-The system supports:
+This document defines the end-to-end technical architecture for a serverless, event-driven, multi-agent platform that provides:
+	•	Automated Issue Management
+	•	Conversational AI–based interaction
+	•	Streaming analytics and SLA reporting
+	•	Secure, controlled Spend Analytics
+	•	Governed AI agent execution using ADK (Agent Development Kit)
 
-* Automated issue lifecycle management
-* Conversational AI–based user interaction
-* Real-time operational queries
-* Streaming analytics and SLA reporting
-* A secure, controlled Spend Analytics Agent
+The objective is to present a production-ready, auditable, and cost-controlled design aligned with modern enterprise cloud and AI governance standards.
 
-The architecture follows **cloud-native, cost-optimized, and agent-safe design principles**, enabling scalability, auditability, and future expansion without refactoring.
+⸻
 
----
+2. Architectural Objectives
 
-## 2. Architectural Goals
+Objective	Description
+Scalability	Automatic scaling without capacity planning
+Cost Optimization	Usage-based pricing; no idle infrastructure
+Agent Safety	Strict control over agent actions and data access
+Auditability	Immutable event history for compliance
+Low Latency	Real-time responses for user interactions
+Separation of Concerns	Clear isolation of operational and analytical workloads
+AI Governance	Deterministic, tool-restricted agent behavior
 
-| Goal                   | Description                               |
-| ---------------------- | ----------------------------------------- |
-| Scalability            | Handle growth without capacity planning   |
-| Cost efficiency        | Pay only for usage; avoid expensive scans |
-| Agent safety           | Prevent uncontrolled access to data       |
-| Auditability           | Maintain immutable event history          |
-| Low latency            | Instant responses for conversational UI   |
-| Separation of concerns | Operational vs analytical workloads       |
 
----
+⸻
 
-## 3. High-Level Architecture Overview
+3. Architectural Overview
 
-The platform is composed of **two logical domains**:
+The platform is organized into two logically isolated domains, unified by shared infrastructure patterns and governed by ADK-managed agents.
 
-1. **Issue Management Domain**
-   Handles issue creation, lifecycle automation, and real-time status queries.
+3.1 Domains
+	1.	Issue Management Domain
+Manages issue creation, lifecycle automation, and real-time status queries.
+	2.	Spend Analytics Domain
+Provides read-only, aggregated cost insights via a controlled analytics agent.
 
-2. **Spend Analytics Domain**
-   Provides controlled, read-only financial insights through a dedicated agent.
+Each domain follows an agent-first interaction model while maintaining strict boundaries between operational systems and analytical systems.
 
-Both domains share **common infrastructure patterns** but remain logically isolated.
+⸻
 
----
+4. Core Architecture Principles
 
-## 4. Core Architecture Principles
+4.1 Event-Driven Architecture
+	•	All state changes generate immutable events
+	•	Events are append-only and never mutated
+	•	Downstream systems consume events asynchronously
+	•	Operational workflows are decoupled from analytics
 
-### 4.1 Event-Driven Design
+4.2 Dual Data Model
 
-* All state changes emit events
-* Events are immutable and append-only
-* Downstream systems consume events asynchronously
+Workload Type	Storage
+Operational state	Firestore
+Analytical history	BigQuery
 
-### 4.2 Dual Data Model
+This separation ensures:
+	•	Low-latency transactional access
+	•	Cost-efficient analytical processing
+	•	No cross-contamination of workloads
 
-* **Operational State** → Firestore
-* **Analytical History** → BigQuery
+4.3 Agent-First API Design (ADK)
+	•	Agents interact only through approved tools
+	•	No direct database access from agents
+	•	All agent actions are:
+	•	Explicit
+	•	Inspectable
+	•	Deterministic
+	•	Tool contracts define exactly what an agent can and cannot do
 
-### 4.3 Agent-First APIs
+4.4 Serverless-First Design
 
-* Agents interact only via safe, read-only APIs
-* No direct database access from conversational UI
+All components scale automatically and incur cost only when used:
+	•	Cloud Functions (Gen2)
+	•	Pub/Sub
+	•	Dataflow
+	•	BigQuery
+	•	Cloud Tasks
 
-### 4.4 Serverless by Default
+⸻
 
-* Cloud Functions (Gen2)
-* Pub/Sub
-* Dataflow
-* BigQuery
-* Cloud Tasks
+5. ADK (Agent Development Kit) – Architectural Role
 
----
+5.1 Why ADK Is Used
 
-## 5. Issue Management Architecture (End-to-End)
+ADK is introduced to enforce enterprise-grade AI governance, ensuring:
+	•	Controlled tool invocation
+	•	Prevention of hallucinated logic or SQL
+	•	Deterministic execution paths
+	•	Safe conversational reasoning
+	•	Clear separation between reasoning and execution
 
----
+5.2 Scope of ADK Usage
 
-### 5.1 User / Conversational UI
+Area	ADK Usage
+Conversational intent interpretation	Yes
+Tool selection and invocation	Yes
+Spend analytics reasoning	Yes
+Issue lifecycle automation	No
+Streaming pipelines	No
 
-Users interact via:
+Design Decision:
+ADK is applied only where reasoning and decision-making are required.
+All state transitions and pipelines remain deterministic and code-driven.
 
-* Chat UI
-* Web / App UI
-* Vertex AI Conversational Agent
+⸻
 
-Supported intents:
+6. Issue Management Architecture
 
-* “Create an issue”
-* “What’s the status of my issue?”
-* “Is my issue completed?”
+6.1 User Interaction Layer
 
----
+Users interact through:
+	•	Chat interfaces
+	•	Web or mobile applications
+	•	Conversational AI powered by Vertex AI
 
-### 5.2 API Layer – Cloud Functions (Gen 2)
+Supported intents include:
+	•	Issue creation
+	•	Issue status lookup
+	•	Issue completion checks
 
-#### 5.2.1 `submit_issue`
+Intent interpretation and tool selection are handled by the ADK-managed Issue Agent.
 
-**Purpose**
+⸻
 
-* Creates a new issue
-* Computes SLA
-* Triggers automation
-* Publishes initial lifecycle event
+6.2 ADK-Managed Issue Agent
 
-**Responsibilities**
+Responsibilities
+	•	Interpret user intent
+	•	Invoke approved APIs
+	•	Enforce read/write boundaries
+	•	Format structured responses
 
-* Validate request
-* Persist issue in Firestore
-* Publish `new` event to Pub/Sub
-* Schedule lifecycle via Cloud Tasks
-* Return Gemini acknowledgement
+Allowed Tools
+	•	submit_issue
+	•	get_issue_status
 
----
+Explicitly Disallowed
+	•	Direct Firestore access
+	•	Direct BigQuery access
+	•	Any analytical queries
+	•	Any form of SQL generation
 
-#### 5.2.2 `update_issue_status`
+⸻
 
-**Purpose**
+6.3 API Layer (Cloud Functions – Gen2)
 
-* Handles lifecycle transitions
+6.3.1 submit_issue
+Responsibilities
+	•	Validate request payload
+	•	Create issue record in Firestore
+	•	Compute SLA metadata
+	•	Publish lifecycle event to Pub/Sub
+	•	Schedule future transitions via Cloud Tasks
+	•	Return acknowledgment to the agent
 
-**Trigger**
+⸻
 
-* Cloud Tasks (time-based)
+6.3.2 update_issue_status
+Trigger
+	•	Cloud Tasks (time-based execution)
 
-**Responsibilities**
+Responsibilities
+	•	Read current issue state
+	•	Apply deterministic state transition
+	•	Persist updated state in Firestore
+	•	Publish lifecycle event
 
-* Read current state
-* Update Firestore status
-* Publish lifecycle event (`assigned`, `in_progress`, `completed`)
+This function is not agent-controlled and contains no AI logic.
 
----
+⸻
 
-#### 5.2.3 `get_issue_status`
+6.3.3 get_issue_status
+Responsibilities
+	•	Read current issue state
+	•	Return structured, read-only response
+	•	No side effects
 
-**Purpose**
+This API is safe for both UI and agent consumption.
 
-* Read-only API for agents and UI
+⸻
 
-**Responsibilities**
+6.4 Firestore – Operational Data Store
+	•	Collection: issues
+	•	One document per issue
+	•	Optimized for point reads
+	•	No analytical queries permitted
 
-* Fetch current issue state
-* Return safe, structured response
-* No side effects
+Firestore is used exclusively for current state, not history.
 
----
+⸻
 
-### 5.3 Firestore – Operational Store
+6.5 Cloud Tasks – Lifecycle Automation
+	•	Schedules delayed status transitions
+	•	Ensures retry and idempotency
+	•	Prevents long-running or blocking functions
+	•	Eliminates polling-based designs
 
-**Collection:** `issues`
+⸻
 
-**Role**
+6.6 Pub/Sub – Event Backbone
+	•	Decouples operational workflows from analytics
+	•	Transports immutable lifecycle events
 
-* Stores the **current state** of each issue
-* Used for real-time reads and updates
+Event Characteristics
+	•	Append-only
+	•	Time-stamped
+	•	Schema-controlled
 
-**Characteristics**
+⸻
 
-* One document per issue
-* Point reads by issue_id
-* Low latency
-* No analytical queries
+6.7 Dataflow – Streaming Ingestion
+	•	Uses managed Pub/Sub → BigQuery template
+	•	No custom Beam code
+	•	Schema enforcement at ingestion
+	•	Near real-time event availability in BigQuery
 
----
+⸻
 
-### 5.4 Cloud Tasks – Lifecycle Automation
+6.8 BigQuery – Issue Analytics Layer
 
-**Role**
+issues_status_history
+	•	Immutable lifecycle event log
+	•	Used for:
+	•	SLA calculations
+	•	Auditing
+	•	Trend analysis
 
-* Executes delayed lifecycle transitions
-* Ensures reliability and retries
+issues_current
+	•	Derived table
+	•	One row per issue
+	•	Optimized for dashboards and agent-safe analytics
 
-**Why Cloud Tasks**
+⸻
 
-* Prevents long-running functions
-* Avoids polling
-* Ensures idempotent execution
+6.9 State Materialization
 
----
+A scheduled BigQuery MERGE job:
+	•	Derives latest issue state
+	•	Eliminates repeated window queries
+	•	Reduces query cost and latency
 
-### 5.5 Pub/Sub – Event Backbone
+⸻
 
-**Role**
+7. Spend Analytics Architecture
 
-* Decouples operational workflows from analytics
-* Transports lifecycle events
+7.1 Spend Data Storage
 
-**Event Schema**
+Table	Description
+spend_raw	Immutable billing and usage data
+spend_aggregated_daily	Daily summarized costs
+spend_current_month	Optimized monthly view
 
-```json
-{
-  "issue_id": "INC-123",
-  "old_status": "assigned",
-  "new_status": "in_progress",
-  "priority": "P3",
-  "source": "cloud_tasks",
-  "changed_at": "2026-01-08T14:15:00Z"
-}
-```
 
----
+⸻
 
-### 5.6 Dataflow – Streaming Ingestion
+7.2 ADK-Managed Spend Analytics Agent
 
-**Type**
+Responsibilities
+	•	Answer cost and usage questions
+	•	Explain trends in business language
+	•	Provide consistent, governed responses
 
-* Google-managed `PubSub_to_BigQuery` template
+Strict Safety Rules
+	•	Read-only access
+	•	Predefined query paths only
+	•	Aggregated datasets only
+	•	No dynamic SQL
+	•	No free-form data exploration
 
-**Responsibilities**
+ADK enforces these constraints at runtime.
 
-* Consume Pub/Sub events
-* Enforce schema
-* Stream into BigQuery
+⸻
 
-**Design Choice**
+8. Multi-Agent Model
 
-* No transformations
-* No custom Beam logic
-* Schema enforced at producer
+Agent	Data Access	Purpose
+Issue Agent	Firestore, issue APIs	Real-time issue operations
+Analytics Agent	BigQuery (derived tables)	SLA and trend insights
+Spend Agent	BigQuery (aggregated spend)	Cost analysis
 
----
+Each agent operates independently under ADK governance.
 
-### 5.7 BigQuery – Issue Analytics Layer
+⸻
 
-#### 5.7.1 `issues_status_history`
+9. Cost Optimization Strategy
 
-**Type:** Immutable event log
-**Written by:** Dataflow
+Key architectural decisions:
+	•	Firestore for transactional reads
+	•	BigQuery only for analytics
+	•	Derived tables to avoid repeated scans
+	•	Serverless services with scale-to-zero
+	•	No LLM-generated SQL (enforced by ADK)
 
-**Purpose**
+Result
+	•	Predictable cloud costs
+	•	No runaway analytical queries
+	•	No idle infrastructure
+	•	Controlled AI usage
 
-* Lifecycle trace
-* SLA calculation
-* Auditing
-* Trend analysis
+⸻
 
----
+10. Security and Access Model
+	•	Public access only to agent-safe APIs
+	•	No direct database access from UI or agents
+	•	IAM-based service-to-service authentication
+	•	Read-only BigQuery permissions for agents
+	•	Separation of operational and analytical IAM roles
 
-#### 5.7.2 `issues_current`
+⸻
 
-**Type:** Derived table
-**Written by:** Scheduled MERGE
-
-**Purpose**
-
-* One row per issue
-* Fast dashboard queries
-* Agent analytics
-
----
-
-### 5.8 Scheduled MERGE (State Materialization)
-
-**Role**
-
-* Derives latest issue state from history
-* Runs every few minutes
-* Eliminates repeated window queries
-
----
-
-## 6. Spend Analytics Agent Architecture
-
----
-
-### 6.1 Spend Data Sources
-
-* Billing exports
-* Application usage metrics
-* Internal finance feeds
-
----
-
-### 6.2 Spend Data Storage (BigQuery)
-
-| Table                    | Purpose                  |
-| ------------------------ | ------------------------ |
-| `spend_raw`              | Immutable raw spend data |
-| `spend_aggregated_daily` | Daily cost summaries     |
-| `spend_current_month`    | Optimized agent queries  |
-
----
-
-### 6.3 Spend Analytics Agent
-
-**Responsibilities**
-
-* Answer cost and usage questions
-* Explain trends using Gemini
-* Never generate SQL
-
-**Example Queries**
-
-* “What is my spend this month?”
-* “Which service costs the most?”
-* “Why did spend increase last week?”
-
----
-
-### 6.4 Spend Agent Safety Rules
-
-* No dynamic SQL
-* Predefined queries only
-* Read-only access
-* Aggregated datasets only
-
----
-
-## 7. Multi-Agent Interaction Model
-
-| Agent           | Data Source                | Purpose          |
-| --------------- | -------------------------- | ---------------- |
-| Issue Agent     | Firestore / issues_current | Real-time status |
-| Analytics Agent | BigQuery                   | Trends, SLA      |
-| Spend Agent     | BigQuery                   | Cost insights    |
-
----
-
-## 8. Cost Optimization Strategy
-
-### Key Decisions
-
-* Firestore for point reads (cheap, fast)
-* BigQuery only for analytics
-* Derived tables to avoid repeated scans
-* Serverless everywhere (scale to zero)
-* No LLM-generated SQL
-
-### Cost-Saving Outcomes
-
-* Predictable spend
-* No runaway queries
-* No idle infrastructure
-* Controlled AI usage
-
----
-
-## 9. GCP Logical Architecture Diagram
-
-```mermaid
-flowchart TB
-    User[User / Conversational UI]
-
-    CF1[submit_issue]
-    CF2[update_issue_status]
-    CF3[get_issue_status]
-
-    FS[(Firestore)]
-    CT[Cloud Tasks]
-    PS[(Pub/Sub)]
-    DF[Dataflow]
-
-    BQH[(BQ: issues_status_history)]
-    BQC[(BQ: issues_current)]
-
-    SA[Spend Analytics Agent]
-    BQS[(BQ: Spend Datasets)]
-
-    AI[Vertex AI Gemini]
-
-    User --> CF1
-    User --> CF3
-    User --> SA
-
-    CF1 --> FS
-    CF1 --> PS
-    CF1 --> CT
-    CF1 --> AI
-
-    CT --> CF2
-    CF2 --> FS
-    CF2 --> PS
-
-    PS --> DF
-    DF --> BQH
-    BQH --> BQC
-
-    SA --> BQS
-    SA --> AI
-```
-
----
-
-## 10. Security & Access Model (High-Level)
-
-* Public access only for agent-safe APIs
-* No direct database access from UI
-* IAM-controlled service-to-service access
-* Read-only BigQuery access for agents
-
----
-
-## 11. Why This Architecture Is Production-Grade
-
-* Event-sourced
-* Horizontally scalable
-* Cost-controlled
-* Agent-safe
-* Auditable
-* Extensible
-
-This design aligns with **modern enterprise cloud architecture standards**.
-
----
-
-## 12. Future Enhancements
-
-* SLA breach alerts
-* Escalation workflows
-* Cost anomaly detection
-* Predictive resolution times
-* Looker dashboards
-* Fine-grained IAM policies
-
----
-
-## 13. Final Summary
-
-This architecture delivers a **robust, scalable, and intelligent platform** that combines:
-
-* Automated Issue Management
-* Conversational AI
-* Streaming analytics
-* Secure Spend Analysis
-
-It is **ready for production**, **easy to extend**, and **safe for AI-driven interaction**.
-
----
 
 
