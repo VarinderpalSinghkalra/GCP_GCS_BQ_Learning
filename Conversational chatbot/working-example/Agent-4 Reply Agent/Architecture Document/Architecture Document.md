@@ -2,7 +2,6 @@ Issue Management & Spend Analytics Platform
 
 ADK-Enabled Multi-Agent Architecture on Google Cloud Platform
 
-⸻
 
 1. Purpose of This Document
 
@@ -15,7 +14,7 @@ This document defines the end-to-end technical architecture for a serverless, ev
 
 The objective is to present a production-ready, auditable, and cost-controlled design aligned with modern enterprise cloud and AI governance standards.
 
-⸻
+
 
 2. Architectural Objectives
 
@@ -29,8 +28,6 @@ Separation of Concerns	Clear isolation of operational and analytical workloads
 AI Governance	Deterministic, tool-restricted agent behavior
 
 
-⸻
-
 3. Architectural Overview
 
 The platform is organized into two logically isolated domains, unified by shared infrastructure patterns and governed by ADK-managed agents.
@@ -43,7 +40,6 @@ Provides read-only, aggregated cost insights via a controlled analytics agent.
 
 Each domain follows an agent-first interaction model while maintaining strict boundaries between operational systems and analytical systems.
 
-⸻
 
 4. Core Architecture Principles
 
@@ -82,7 +78,6 @@ All components scale automatically and incur cost only when used:
 	•	BigQuery
 	•	Cloud Tasks
 
-⸻
 
 5. ADK (Agent Development Kit) – Architectural Role
 
@@ -108,7 +103,6 @@ Design Decision:
 ADK is applied only where reasoning and decision-making are required.
 All state transitions and pipelines remain deterministic and code-driven.
 
-⸻
 
 6. Issue Management Architecture
 
@@ -126,7 +120,6 @@ Supported intents include:
 
 Intent interpretation and tool selection are handled by the ADK-managed Issue Agent.
 
-⸻
 
 6.2 ADK-Managed Issue Agent
 
@@ -146,7 +139,6 @@ Explicitly Disallowed
 	•	Any analytical queries
 	•	Any form of SQL generation
 
-⸻
 
 6.3 API Layer (Cloud Functions – Gen2)
 
@@ -159,7 +151,6 @@ Responsibilities
 	•	Schedule future transitions via Cloud Tasks
 	•	Return acknowledgment to the agent
 
-⸻
 
 6.3.2 update_issue_status
 Trigger
@@ -173,7 +164,6 @@ Responsibilities
 
 This function is not agent-controlled and contains no AI logic.
 
-⸻
 
 6.3.3 get_issue_status
 Responsibilities
@@ -183,7 +173,6 @@ Responsibilities
 
 This API is safe for both UI and agent consumption.
 
-⸻
 
 6.4 Firestore – Operational Data Store
 	•	Collection: issues
@@ -193,7 +182,6 @@ This API is safe for both UI and agent consumption.
 
 Firestore is used exclusively for current state, not history.
 
-⸻
 
 6.5 Cloud Tasks – Lifecycle Automation
 	•	Schedules delayed status transitions
@@ -201,7 +189,6 @@ Firestore is used exclusively for current state, not history.
 	•	Prevents long-running or blocking functions
 	•	Eliminates polling-based designs
 
-⸻
 
 6.6 Pub/Sub – Event Backbone
 	•	Decouples operational workflows from analytics
@@ -212,7 +199,6 @@ Event Characteristics
 	•	Time-stamped
 	•	Schema-controlled
 
-⸻
 
 6.7 Dataflow – Streaming Ingestion
 	•	Uses managed Pub/Sub → BigQuery template
@@ -220,7 +206,6 @@ Event Characteristics
 	•	Schema enforcement at ingestion
 	•	Near real-time event availability in BigQuery
 
-⸻
 
 6.8 BigQuery – Issue Analytics Layer
 
@@ -236,7 +221,6 @@ issues_current
 	•	One row per issue
 	•	Optimized for dashboards and agent-safe analytics
 
-⸻
 
 6.9 State Materialization
 
@@ -245,7 +229,6 @@ A scheduled BigQuery MERGE job:
 	•	Eliminates repeated window queries
 	•	Reduces query cost and latency
 
-⸻
 
 7. Spend Analytics Architecture
 
@@ -257,7 +240,6 @@ spend_aggregated_daily	Daily summarized costs
 spend_current_month	Optimized monthly view
 
 
-⸻
 
 7.2 ADK-Managed Spend Analytics Agent
 
@@ -275,7 +257,7 @@ Strict Safety Rules
 
 ADK enforces these constraints at runtime.
 
-⸻
+
 
 8. Multi-Agent Model
 
@@ -286,7 +268,7 @@ Spend Agent	BigQuery (aggregated spend)	Cost analysis
 
 Each agent operates independently under ADK governance.
 
-⸻
+
 
 9. Cost Optimization Strategy
 
@@ -303,7 +285,7 @@ Result
 	•	No idle infrastructure
 	•	Controlled AI usage
 
-⸻
+
 
 10. Security and Access Model
 	•	Public access only to agent-safe APIs
@@ -312,7 +294,7 @@ Result
 	•	Read-only BigQuery permissions for agents
 	•	Separation of operational and analytical IAM roles
 
-⸻
+
 
 
 
