@@ -1,0 +1,165 @@
+ Proof of Concept (POC): ADK-Based Intelligent Decision Layer for Issue Management
+
+## 1. Purpose of the POC
+
+The purpose of this Proof of Concept (POC) is to demonstrate how an **Agent Development Kit (ADK)**–based decision layer can be integrated into an existing, event-driven issue management platform to enhance automation intelligence—without disrupting current execution, data pipelines, or compliance controls.
+
+This POC validates that ADK can be safely used to guide operational decisions while preserving deterministic system behavior.
+
+---
+
+## 2. Scope of the POC
+
+### In Scope
+
+* ADK integration as a **decision-only layer**
+* Invocation of ADK at **issue creation**
+* Context-aware decision-making for:
+
+  * Automation strategy
+  * Escalation readiness
+  * SLA handling posture
+* Structured logging of ADK decisions
+* Analysis readiness via BigQuery
+
+### Out of Scope
+
+* Replacing existing workflows
+* Modifying raw data pipelines
+* ADK-driven execution or database updates
+* Continuous decision-making at every lifecycle step
+
+---
+
+## 3. Existing System (Baseline)
+
+The baseline system is a fully functional, event-driven platform built on GCP services:
+
+* Issue ingestion via APIs (Cloud Functions / Cloud Run)
+* Firestore as the system of record
+* Pub/Sub for asynchronous event processing
+* Cloud Tasks for time-based automation
+* Dataflow for streaming ingestion
+* BigQuery for analytics and SLA reporting
+* AI usage limited to user-facing acknowledgement responses
+
+All automation logic in the baseline system is deterministic and rule-based.
+
+---
+
+## 4. ADK Integration in the POC
+
+### Role of ADK
+
+In this POC, ADK is introduced as a **non-blocking, asynchronous decision layer**. Its role is limited to **evaluating issue context** and **recommending automation paths** at the time of issue creation.
+
+ADK does **not**:
+
+* Write to Firestore
+* Trigger Cloud Tasks directly
+* Publish raw events
+* Modify SLA data
+
+---
+
+### ADK Invocation Point
+
+ADK is invoked **after an issue is successfully created** and persisted. This ensures:
+
+* No impact on API latency
+* Graceful degradation if ADK is unavailable
+* Clear separation between decision-making and execution
+
+---
+
+### Decision Inputs
+
+ADK evaluates:
+
+* Issue priority (P1–P4)
+* Initial SLA parameters
+* Issue metadata
+* Policy constraints
+
+---
+
+### Decision Outputs
+
+ADK returns structured decisions such as:
+
+* Apply standard automation flow
+* Accelerate escalation readiness
+* Adjust SLA monitoring strategy
+
+All decisions are emitted as **structured metadata events**.
+
+---
+
+## 5. Guardrails Implemented
+
+To ensure safe and predictable behavior, the following guardrails are enforced:
+
+* ADK decisions are advisory, not executable
+* Policy-based constraints on escalation
+* Confidence thresholds for decision acceptance
+* Rate limits and cooldowns
+* Asynchronous execution with fallback to baseline logic
+* Full decision audit logging
+
+---
+
+## 6. Observability & Analytics
+
+All ADK decisions are:
+
+* Versioned via deployment metadata
+* Logged as structured events
+* Ingested into BigQuery
+
+This enables:
+
+* Comparison of ADK decisions vs baseline behavior
+* SLA outcome analysis
+* Confidence and accuracy tracking
+* Safe iteration and tuning
+
+---
+
+## 7. Validation Criteria
+
+The POC is considered successful if it demonstrates:
+
+* ADK can be integrated without impacting system stability
+* Issue creation remains fast and reliable
+* ADK decisions are explainable and auditable
+* System degrades gracefully when ADK is unavailable
+* Decisions can be analyzed against SLA outcomes
+
+---
+
+## 8. Key Learnings from the POC
+
+* Decision-making can be decoupled from execution safely
+* Issue creation is the most effective point for AI-driven triage
+* Structured decision logging is essential for trust and governance
+* ADK adds value without increasing operational risk
+
+---
+
+## 9. Production Readiness & Next Steps
+
+Based on this POC, the following enhancements are recommended for production:
+
+* Enable ADK in shadow mode for additional lifecycle checkpoints
+* Introduce differentiated automation for high-impact issues
+* Extend ADK decisioning to spend analytics interpretation
+* Implement controlled rollout for P1/P2 issues only
+* Add ServiceNow integration for decision visibility
+
+---
+
+## 10. Conclusion
+
+This POC successfully demonstrates that ADK can be used as an intelligent, controlled decision layer within an enterprise-grade issue management platform. By limiting ADK to early lifecycle decision-making and preserving deterministic execution, the solution achieves a balance between adaptability and reliability, providing a strong foundation for production-scale intelligent automation.
+
+---
