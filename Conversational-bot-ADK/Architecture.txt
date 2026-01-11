@@ -1,11 +1,355 @@
-User
- ↓
-ADK Agent (Reasoning + Orchestration)
- ↓  (Tool call via OpenAPI)
-submit_issue (Cloud Run / Cloud Function)
- ↓
-Firestore + Gemini
- ↓
-Structured JSON
- ↓
-ADK Agent → User
+#  Issue Management Agent
+
+## Enterprise Architecture Document
+
+---
+
+## 1. Document Control
+
+| Item              | Details                             |
+| ----------------- | ----------------------------------- |
+| System Name       | Issue Management Agent              |
+| Cloud Platform    | Google Cloud Platform (GCP)         |
+| Architecture Type | Serverless, Event-Driven, AI-Native |
+| AI Framework      | Vertex AI Agents (ADK)              |
+| LLM               | Gemini 2.5 Flash                    |
+| Document Version  | 1.0                                 |
+| Status            | Production Ready                    |
+
+---
+
+## 2. Business Objective
+
+The Issue Management Agent is designed to provide a **scalable, AI-driven incident management capability** that enables organizations to:
+
+* Log incidents conversationally
+* Enforce SLA policies automatically
+* Track incident lifecycle without manual intervention
+* Produce analytics-ready operational telemetry
+* Integrate easily with ITSM and reporting platforms
+
+The system eliminates manual ticket handling while ensuring **reliability, auditability, and extensibility**.
+
+---
+
+## 3. Architectural Principles
+
+The solution adheres to the following enterprise architecture principles:
+
+* **Serverless First** – No infrastructure management
+* **Event-Driven** – Loose coupling between components
+* **AI-Controlled Orchestration** – LLMs decide *what*, tools execute *how*
+* **Fail-Safe Design** – No unhandled exceptions, no system crashes
+* **Least Privilege Security** – IAM-driven access control
+* **Cost-Optimized** – Pay-per-use model only
+
+---
+
+## 4. High-Level Architecture
+
+### Logical View
+
+```
+End User
+   │
+   ▼
+Vertex AI Agent (ADK)
+   │
+   ▼
+Issue Management Tool (Stateless)
+   │
+   ├── Firestore (State & SLA Store)
+   ├── Pub/Sub (Event Backbone)
+   └── Cloud Tasks (Time-Based Automation)
+           │
+           ▼
+     Cloud Function (Lifecycle Executor)
+```
+
+---
+
+## 5. Component Architecture
+
+### 5.1 Vertex AI Agent (Control Plane)
+
+**Purpose**
+Acts as the intelligent orchestration layer between users and backend systems.
+
+**Responsibilities**
+
+* Interpret natural language requests
+* Select and invoke correct tools
+* Enforce conversational guardrails
+* Provide business-friendly responses
+
+**Key Characteristics**
+
+* Tool-only execution (no hallucinated actions)
+* Deterministic behavior via instructions
+* Low-latency inference using Gemini Flash
+
+---
+
+### 5.2 Issue Management Tool (Application Layer)
+
+**Purpose**
+Implements the core business logic of the system.
+
+**Responsibilities**
+
+* Validate inputs
+* Compute SLA targets
+* Persist issue records
+* Publish lifecycle events
+* Schedule automation workflows
+* Generate acknowledgment responses
+
+**Design Attributes**
+
+* Stateless
+* Idempotent
+* Safe execution (never throws uncaught exceptions)
+
+---
+
+### 5.3 Firestore (System of Record)
+
+**Collections**
+
+* `issues`
+* `users`
+
+**Stored Data**
+
+* Issue metadata
+* Priority and SLA timestamps
+* Status transitions
+* Audit timestamps
+
+**Rationale**
+
+* Strong consistency
+* Horizontal scalability
+* Native serverless operation
+* Fine-grained IAM security
+
+---
+
+### 5.4 Pub/Sub (Event Backbone)
+
+**Topic**
+
+* `issues-topic`
+
+**Event Types**
+
+* Issue creation
+* Status updates
+* Lifecycle transitions
+
+**Purpose**
+
+* Decouple producers and consumers
+* Enable downstream analytics
+* Support future integrations (ServiceNow, BigQuery, SIEM)
+
+**Guarantees**
+
+* At-least-once delivery
+* Schema-friendly JSON events
+
+---
+
+### 5.5 Cloud Tasks (Automation Engine)
+
+**Queue**
+
+* `issue-status-queue`
+
+**Purpose**
+
+* Execute time-based workflows
+* Automate incident lifecycle progression
+* Ensure retry and durability
+
+**Why Cloud Tasks**
+
+* Reliable scheduling
+* Native HTTP invocation
+* Controlled execution timing
+
+---
+
+### 5.6 Cloud Function (Execution Layer)
+
+**Purpose**
+
+* Apply lifecycle status changes
+* Update persistent state
+* Emit audit events
+
+**Trigger**
+
+* Cloud Tasks HTTP requests
+
+**Design Constraints**
+
+* Stateless
+* Idempotent
+* Always returns HTTP 200
+
+---
+
+## 6. End-to-End Flow Description
+
+### 6.1 Incident Creation Flow
+
+1. User reports an issue via conversational interface
+2. Agent identifies intent and invokes issue submission tool
+3. SLA targets are computed based on priority
+4. Issue record is persisted in Firestore
+5. Creation event is published to Pub/Sub
+6. Lifecycle tasks are scheduled
+7. AI acknowledgment is returned to the user
+
+---
+
+### 6.2 Automated Lifecycle Flow
+
+1. Cloud Task executes at scheduled time
+2. Cloud Function updates issue status
+3. Firestore state is updated
+4. Pub/Sub event is emitted
+5. Analytics and integrations consume the event
+
+---
+
+### 6.3 Status Query Flow
+
+1. User requests issue status
+2. Agent invokes status lookup tool
+3. Firestore is queried
+4. Current status is returned
+5. Agent explains status in business language
+
+---
+
+## 7. SLA Architecture
+
+### SLA Policy Model
+
+| Priority | Response SLA | Resolution SLA |
+| -------- | ------------ | -------------- |
+| P1       | 15 minutes   | 4 hours        |
+| P2       | 1 hour       | 24 hours       |
+| P3       | 4 hours      | 3 days         |
+| P4       | 8 hours      | 7 days         |
+
+### SLA Enforcement
+
+* SLA timestamps stored at creation time
+* Breach flags extensible for future automation
+* Analytics-ready for reporting
+
+---
+
+## 8. Security Architecture
+
+### Identity & Access Management
+
+* Dedicated service accounts
+* Least-privilege IAM roles
+* No hard-coded credentials
+
+### Data Protection
+
+* Firestore IAM controls
+* Encrypted at rest and in transit
+* HTTPS-only communication
+
+### AI Safety
+
+* Tool-restricted execution
+* No autonomous system changes
+* Guardrails defined in agent instructions
+
+---
+
+## 9. Scalability & Reliability
+
+### Scalability
+
+* Fully managed services
+* Automatic horizontal scaling
+* No capacity planning required
+
+### Reliability
+
+* Managed retries via Cloud Tasks
+* Durable storage in Firestore
+* Decoupled event delivery via Pub/Sub
+
+### Failure Handling
+
+* Graceful degradation
+* Errors logged, not exposed
+* System always responds successfully
+
+---
+
+## 10. Observability & Analytics
+
+### Telemetry Sources
+
+* Pub/Sub issue events
+* Firestore timestamps
+
+### Analytics Pipeline (Optional)
+
+* Pub/Sub → BigQuery
+* BigQuery → Looker Studio
+
+### Key Metrics
+
+* SLA compliance rate
+* Mean time to resolution
+* Incident volume by priority
+* Automation efficiency
+
+---
+
+## 11. Cost Optimization
+
+* Gemini Flash for low inference cost
+* Serverless execution (no idle cost)
+* Pay-per-use Pub/Sub and Firestore
+* No VM or GKE overhead
+
+---
+
+## 12. Extensibility Roadmap
+
+Planned / Supported Extensions:
+
+* ServiceNow integration
+* Jira / PagerDuty sync
+* BigQuery ML for SLA prediction
+* Cost & Spend Optimization Agent
+* ADK decision-rationale logging
+
+---
+
+## 13. Architecture Summary
+
+This architecture delivers:
+
+* **AI-native incident management**
+* **Enterprise-grade reliability**
+* **Operational transparency**
+* **Low operational cost**
+* **Future-ready extensibility**
+
+It is suitable for **production deployment**, **client delivery**, and **enterprise audits**.
+
+---
+
