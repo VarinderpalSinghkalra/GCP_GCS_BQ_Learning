@@ -1,0 +1,74 @@
+openapi: 3.0.0
+
+info:
+  title: Submit Issue API
+  version: "1.0.0"
+  description: >
+    Tool-backed API for creating support issues via conversational agents.
+    Designed for Vertex AI Agents (ADK).
+    Always returns HTTP 200 with structured JSON.
+
+servers:
+  - url: https://submit-issue-277069041958.us-central1.run.app
+    description: Submit Issue Backend (Cloud Run)
+
+paths:
+  /:
+    post:
+      operationId: createIssue
+      summary: Create a support issue
+      description: >
+        Creates a new support issue, stores it in Firestore,
+        computes SLA based on priority, triggers automated
+        lifecycle workflows, and returns an assistant
+        acknowledgement message.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reporter_id
+                - issue
+              properties:
+                reporter_id:
+                  type: string
+                  description: Unique identifier of the reporting user
+                  example: deployment-test
+                issue:
+                  type: string
+                  minLength: 5
+                  description: Description of the reported issue
+                  example: Cloud Run deployment verification
+                priority:
+                  type: string
+                  enum: [P1, P2, P3, P4]
+                  default: P3
+                  description: Issue priority (defaults to P3 if missing)
+
+      responses:
+        "200":
+          description: Issue creation result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - issue_id
+                  - status
+                  - assistant_reply
+                properties:
+                  issue_id:
+                    type: string
+                    description: System-generated incident identifier
+                    example: INC-2303565C
+                  status:
+                    type: string
+                    description: Creation status
+                    example: created
+                  assistant_reply:
+                    type: string
+                    description: AI-generated acknowledgement message
+                    example: Your issue has been logged successfully.
