@@ -1,5 +1,3 @@
- Proposal
-
 Implementation of Data Science Agent for Spend Analytics (PoC)
 
 ⸻
