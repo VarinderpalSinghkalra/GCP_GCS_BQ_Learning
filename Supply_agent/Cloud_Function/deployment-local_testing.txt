@@ -43,13 +43,6 @@ gcloud functions deploy submit_supply_request \
   --entry-point submit_supply_request \
   --region us-central1
 
-gcloud functions deploy submit_supply_request \
-  --runtime python311 \
-  --trigger-http \
-  --allow-unauthenticated \
-  --entry-point submit_supply_request \
-  --region us-central1
-
 gcloud functions deploy update_supply_status \
   --runtime python311 \
   --trigger-http \
