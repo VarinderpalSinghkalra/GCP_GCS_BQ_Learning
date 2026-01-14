@@ -1,9 +1,60 @@
+gcloud functions deploy get_inventory_item \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point get_inventory_item \
+  --region us-central1
 
-gcloud functions deploy supply_chain_ticket_agent \
+gcloud functions deploy estimate_cost \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point estimate_cost \
+  --region us-central1
+
+gcloud functions deploy approve_budget \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point approve_budget \
+  --region us-central1
+
+
+gcloud functions deploy get_shipping_options \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point get_shipping_options \
+  --region us-central1
+
+
+gcloud functions deploy execute_shipment \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point execute_shipment \
+  --region us-central1
+
+
+gcloud functions deploy submit_supply_request \
   --runtime python311 \
   --trigger-http \
   --allow-unauthenticated \
   --entry-point submit_supply_request \
+  --region us-central1
+
+gcloud functions deploy submit_supply_request \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point submit_supply_request \
+  --region us-central1
+
+gcloud functions deploy update_supply_status \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point update_supply_status \
   --region us-central1
 
 gcloud functions deploy get_supply_status \
@@ -13,13 +64,6 @@ gcloud functions deploy get_supply_status \
   --entry-point get_supply_status \
   --region us-central1
 
-
-gcloud functions deploy update_supply_status \
-  --runtime python311 \
-  --trigger-http \
-  --allow-unauthenticated \
-  --entry-point update_supply_status \
-  --region us-central1
 
 curl -X POST \
   https://us-central1-data-engineering-479617.cloudfunctions.net/supply_chain_ticket_agent \
