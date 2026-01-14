@@ -1,0 +1,252 @@
+ Architecture Document
+
+Conversational Supply Chain Agent System
+
+(ADK-Based Orchestration Using OpenAPI Tools)
+
+⸻
+
+1. Overview
+
+This document describes the architecture of a Conversational, Agent-Driven Supply Chain System built using an Agent Development Kit (ADK) approach, where OpenAPI-defined tools act as the contract between a central orchestrator agent and domain-specific agents.
+
+The system enables:
+	•	Deterministic conversational workflows
+	•	Clear separation of agent responsibilities
+	•	Tool-backed execution with Firestore as the system of record
+	•	Real-time observability of agent interactions
+
+⸻
+
+2. Architectural Goals
+
+The architecture is designed to achieve the following goals:
+	1.	Deterministic agent orchestration
+	2.	Clear ownership per agent (Inventory, Finance, Logistics)
+	3.	Stateless agents with externalized state
+	4.	Tool-based execution aligned with ADK principles
+	5.	Conversational safety and predictability
+	6.	Observability of agent interactions
+
+⸻
+
+3. High-Level Architecture
+
+User (Conversational UI)
+        ↓
+Orchestrator Agent (ADK)
+        ↓
+---------------------------------
+| Inventory Agent (Tool-backed) |
+| Finance Agent   (Tool-backed) |
+| Logistics Agent (Tool-backed) |
+---------------------------------
+        ↓
+Firestore (Single Source of Truth)
+
+
+⸻
+
+4. ADK Design Principles Applied
+
+This system follows core ADK principles, even though the execution is distributed across Cloud Functions.
+
+4.1 Central Orchestrator Agent
+	•	Owns the conversation
+	•	Interprets user intent
+	•	Decides which agent to invoke and when
+	•	Never performs domain logic itself
+
+This aligns with the ADK concept of a Planner / Controller Agent.
+
+⸻
+
+4.2 Domain-Specific Agents
+
+Each domain agent has:
+	•	A single responsibility
+	•	No conversational context
+	•	No memory
+	•	No direct communication with other agents
+
+Agent	Responsibility
+Inventory Agent	Validate stock availability
+Finance Agent	Approve or reject cost
+Logistics Agent	Arrange shipment
+
+This aligns with ADK’s Executor Agent pattern.
+
+⸻
+
+4.3 Tool-First Execution Model
+
+Agents do not execute arbitrary logic.
+All side effects occur via OpenAPI-defined tools.
+
+This ensures:
+	•	Predictability
+	•	Security
+	•	Auditability
+	•	Deterministic behavior
+
+⸻
+
+5. OpenAPI as the ADK Contract
+
+The system uses an openapi.yml file as the formal execution contract.
+
+5.1 Why OpenAPI Is Central
+
+OpenAPI defines:
+	•	What actions an agent can perform
+	•	Input and output schemas
+	•	Allowed side effects
+	•	Error boundaries
+
+In ADK terms, OpenAPI represents the Tool Registry.
+
+⸻
+
+5.2 Tools Defined
+
+Tool (operationId)	Purpose
+createSupplyTicket	Create a new supply order
+getSupplyStatus	Retrieve current ticket state
+updateSupplyStatus	Update ticket lifecycle
+
+Agents cannot operate outside these tools.
+
+⸻
+
+6. Orchestrator Agent Flow (ADK Perspective)
+
+6.1 Intent Handling
+
+The orchestrator:
+	1.	Receives user input
+	2.	Classifies intent (e.g., “create supply request”)
+	3.	Extracts required parameters
+	4.	Calls the appropriate tool
+
+⸻
+
+6.2 Sequential Orchestration
+
+The orchestrator enforces a strict execution order:
+
+new
+ → inventory_checked
+ → approved
+ → completed
+
+This ensures:
+	•	No race conditions
+	•	No skipped steps
+	•	Deterministic workflow execution
+
+⸻
+
+7. Domain Agent Execution Model
+
+7.1 Execution Pattern
+
+Each domain agent follows the same pattern:
+
+Read Firestore
+ ↓
+Apply domain decision
+ ↓
+Call updateSupplyStatus tool
+ ↓
+Exit
+
+Agents:
+	•	Are stateless
+	•	Do not persist memory
+	•	Do not call other agents
+
+⸻
+
+7.2 Firestore as Shared State
+
+Firestore serves as:
+	•	The single source of truth
+	•	The coordination mechanism between agents
+	•	The persistence layer for workflow state
+
+This replaces in-memory or agent-held state, which is a recommended ADK practice for reliability.
+
+⸻
+
+8. Agent Interaction Observability
+
+8.1 Execution Trace Strategy
+
+Each agent emits structured execution trace events describing:
+	•	Which agent invoked which agent
+	•	What action was performed
+	•	Execution status and timestamp
+
+These traces are stored in Firestore and used for:
+	•	Debugging
+	•	Live dashboards
+	•	Architecture transparency
+
+⸻
+
+8.2 Separation of Concerns
+
+Data Type	Storage
+Business state	supply_orders
+Execution traces	agent_traces
+
+This separation ensures:
+	•	Clean data modeling
+	•	Independent evolution of observability
+
+⸻
+
+9. Conversational Safety & Reliability
+
+The architecture ensures:
+	•	All APIs return HTTP 200 with valid JSON
+	•	Agents never crash the conversation
+	•	Failures are handled gracefully by the orchestrator
+	•	No agent can perform unauthorized actions
+
+This is critical for conversational AI reliability.
+
+⸻
+
+10. Why This Is an ADK-Compliant Architecture
+
+This system qualifies as an ADK-based design because:
+	1.	Agents are role-specialized
+	2.	Orchestration is explicit and centralized
+	3.	Tools are schema-defined and constrained
+	4.	State is externalized
+	5.	Execution is deterministic
+	6.	Observability is built-in
+
+This is not a “chatbot with APIs”; it is a tool-driven agent system.
+
+⸻
+
+11. Extensibility
+
+The architecture supports future enhancements without refactoring:
+	•	Add new agents (e.g., Compliance, Vendor)
+	•	Add new tools via OpenAPI
+	•	Introduce SLA enforcement
+	•	Add event-driven automation (Pub/Sub)
+	•	Integrate A2A agents
+
+⸻
+
+12. Conclusion
+
+This architecture demonstrates a clean, enterprise-grade application of ADK principles using OpenAPI-defined tools and Firestore-backed orchestration.
+It provides a strong balance between conversational flexibility and deterministic execution, making it suitable for production systems, demos, and architectural reviews.
+
+⸻
+
