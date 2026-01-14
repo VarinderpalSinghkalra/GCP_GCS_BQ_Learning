@@ -1,0 +1,89 @@
+
+gcloud functions deploy supply_chain_ticket_agent \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point submit_supply_request \
+  --region us-central1
+
+gcloud functions deploy get_supply_status \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point get_supply_status \
+  --region us-central1
+
+
+gcloud functions deploy update_supply_status \
+  --runtime python311 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point update_supply_status \
+  --region us-central1
+
+
+
+ curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/get_supply_status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ORD-FEEB9AEC"
+  }'
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/update_supply_status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ORD-FEEB9AEC",
+    "updates": {
+      "status": "inventory_checked",
+      "inventory": {
+        "available": true,
+        "available_qty": 120,
+        "checked_at": "2026-01-14T10:20:00Z"
+      }
+    }
+  }'
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/update_supply_status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ORD-FEEB9AEC",
+    "updates": {
+      "status": "cost_estimated",
+      "estimated_cost": {
+        "unit_price": 1500,
+        "total": 30000,
+        "currency": "INR"
+      }
+    }
+  }'
+
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/update_supply_status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ORD-FEEB9AEC",
+    "updates": {
+      "status": "approved",
+      "approval_status": {
+        "approved": true,
+        "approved_by": "finance-agent",
+        "approved_at": "2026-01-14T10:22:00Z"
+      }
+    }
+  }'
+
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/update_supply_status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "ORD-FEEB9AEC",
+    "updates": {
+      "status": "completed",
+      "shipment": {
+        "carrier": "BlueDart",
+        "tracking_id": "BD12345",
+        "eta": "2026-01-16"
+      }
+    }
+  }'
