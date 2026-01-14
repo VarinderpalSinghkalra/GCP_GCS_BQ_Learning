@@ -1,1 +1,209 @@
+Live Agent Interaction & Orchestration Dashboard
+
+(Conversational AI + Firestore + AppSheet)
+
+⸻
+
+1. Executive Summary
+
+This proposal presents a solution to visualize real-time agent orchestration in a conversational AI system.
+The objective is to provide clear, live visibility into how agents are invoked, in what sequence, and what actions they perform, without introducing heavy frontend development or additional infrastructure.
+
+The solution leverages:
+	•	Conversational Orchestrator Agent
+	•	Domain-specific agents (Inventory, Finance, Logistics)
+	•	Google Cloud Firestore as the system of record
+	•	AppSheet as a low-code, real-time dashboard layer
+
+This approach is cloud-native, cost-efficient, scalable, and suitable for demos, architecture reviews, audits, and internal observability.
+
+⸻
+
+2. Business Problem
+
+Modern conversational agent systems execute complex workflows behind the scenes. However:
+	•	Agent-to-agent interactions are opaque
+	•	Execution order and responsibility are not visible
+	•	Logs are too technical for stakeholders
+	•	Custom dashboards require time-consuming frontend work
+
+This lack of visibility makes it difficult to:
+	•	Demonstrate system behavior
+	•	Debug orchestration issues
+	•	Explain architecture to non-engineering stakeholders
+	•	Prove correctness of agent collaboration
+
+⸻
+
+3. Objectives
+
+The proposed solution aims to:
+	1.	Provide near real-time visibility into agent execution
+	2.	Show which agent invoked which agent
+	3.	Show what action each agent performed
+	4.	Preserve clear separation of responsibilities
+	5.	Require minimal additional code
+	6.	Avoid custom frontend development
+	7.	Operate within GCP free tier for PoC and demos
+	8.	Be easily extensible for future analytics
+
+⸻
+
+4. Proposed Architecture
+
+High-Level Flow
+
+User (Conversational UI)
+        ↓
+Orchestrator Agent
+        ↓
+Inventory Agent → Finance Agent → Logistics Agent
+        ↓
+Firestore (agent_traces + supply_orders)
+        ↓
+AppSheet Dashboard (Live Visualization)
+
+
+⸻
+
+5. Design Principles
+	•	Single Source of Truth
+Firestore stores both business state and execution traces.
+	•	Loose Coupling
+Agents do not communicate directly; they emit structured trace events.
+	•	Observability by Design
+Execution visibility is treated as a first-class concern.
+	•	Low-Code Visualization
+AppSheet eliminates the need for custom UI development.
+
+⸻
+
+6. Firestore Data Model
+
+6.1 Business Collection: supply_orders
+
+Stores the lifecycle state of supply requests.
+
+Example:
+
+{
+  "order_id": "ORD-123",
+  "status": "approved",
+  "item_id": "ITEM-001",
+  "quantity": 20
+}
+
+
+⸻
+
+6.2 Execution Trace Collection: agent_traces (Top-Level)
+
+Stores agent-to-agent execution events.
+
+Example:
+
+{
+  "order_id": "ORD-123",
+  "from_agent": "orchestrator",
+  "to_agent": "inventory",
+  "action": "check_inventory",
+  "status": "completed",
+  "message": "Inventory validated successfully",
+  "timestamp": "2026-01-14T10:20:03Z"
+}
+
+Rationale for Top-Level Collection
+	•	AppSheet compatibility
+	•	Simplified querying and filtering
+	•	Easier dashboard configuration
+	•	Avoids Firestore subcollection visibility limitations
+
+⸻
+
+7. Agent Instrumentation Strategy
+
+Each agent emits lightweight trace events at key execution points:
+	•	When an agent is invoked
+	•	When an agent completes its task
+
+This requires minimal, non-intrusive code changes and does not alter business logic.
+
+The instrumentation:
+	•	Improves transparency
+	•	Enables live visualization
+	•	Supports debugging and auditing
+
+⸻
+
+8. Dashboard Implementation (AppSheet)
+
+Why AppSheet
+	•	Native Firestore integration
+	•	No frontend coding required
+	•	Near real-time data refresh
+	•	Web and mobile support
+	•	Enterprise-ready access controls
+
+Dashboard Capabilities
+	•	List of active supply orders
+	•	Current lifecycle status
+	•	Chronological agent execution timeline
+	•	Clear indication of:
+	•	Calling agent
+	•	Target agent
+	•	Action performed
+	•	Execution outcome
+
+⸻
+
+9. Implementation Steps (Summary)
+	1.	Emit agent trace events into Firestore
+	2.	Create AppSheet app using Firestore as data source
+	3.	Add supply_orders and agent_traces as tables
+	4.	Configure parent-child relationship via order_id
+	5.	Create:
+	•	Orders list view
+	•	Agent execution timeline view
+	6.	Combine views into an interactive dashboard
+	7.	Enable automatic refresh
+
+⸻
+
+10. Benefits
+
+Benefit	Description
+Transparency	Clear visibility into agent collaboration
+Low Effort	No custom frontend development
+Real-Time	Near real-time execution updates
+Scalable	Add more agents without redesign
+Cost-Efficient	Free-tier friendly
+Demo-Ready	Ideal for reviews and presentations
+
+
+⸻
+
+11. Limitations
+	•	Not millisecond-level real time (seconds-level refresh)
+	•	UI customization limited by AppSheet
+	•	Intended primarily for internal and demo use
+
+These limitations are acceptable given the objectives and scope.
+
+⸻
+
+12. Future Enhancements
+	•	Status-based color coding
+	•	SLA duration tracking
+	•	Historical analytics via BigQuery
+	•	Correlation with Vertex AI Agent Debug View
+	•	Role-based dashboard access
+
+⸻
+
+13. Conclusion
+
+This proposal delivers a practical, scalable, and professional solution to visualize conversational agent orchestration.
+By combining Firestore-based execution traces with a low-code AppSheet dashboard, the system achieves real-time observability with minimal engineering overhead, while remaining aligned with cloud-native and enterprise best practices.
+
+⸻
 
