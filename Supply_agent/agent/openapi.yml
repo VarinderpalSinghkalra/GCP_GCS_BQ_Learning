@@ -1,10 +1,12 @@
 openapi: 3.0.3
 
 info:
-  title: Supply Chain Ticket Agent API
-  version: "1.0.0"
+  title: Supply Chain Intelligence & Ticket API
+  version: "1.1.0"
   description: >
-    Conversational, ticket-based Supply Chain API.
+    Supply Chain Intelligence API for inventory queries, finance approvals,
+    logistics execution, and supply ticket management.
+
     Compatible with Google Vertex AI Conversational Agents and ADK tools.
 
     Guarantees:
@@ -16,40 +18,136 @@ servers:
   - url: https://us-central1-data-engineering-479617.cloudfunctions.net
 
 paths:
-  /supply_chain_ticket_agent:
+  # =====================================================
+  # Inventory (Read-only intelligence)
+  # =====================================================
+  /get_inventory_item:
     post:
-      summary: Create supply chain ticket
-      operationId: createSupplyTicket
+      summary: Get current inventory for an item
+      operationId: getInventoryItem
       description: >
-        Entry point for conversational agents.
-        Creates a new supply chain ticket and persists it in Firestore.
+        Returns live inventory availability for a given item.
+        Used for informational queries. Does NOT create tickets.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-                - requester_id
-                - item_id
-                - quantity
+              required: [item]
               properties:
-                requester_id:
+                item:
                   type: string
-                  description: User or system requesting the supply
-                  example: user_123
-                item_id:
-                  type: string
-                  description: Item identifier
-                  example: ITEM-001
-                quantity:
-                  type: integer
-                  minimum: 1
-                  description: Requested quantity
-                  example: 20
+                  example: screws
       responses:
         "200":
-          description: Ticket successfully created
+          description: Inventory lookup result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryResponse"
+
+  # =====================================================
+  # Finance
+  # =====================================================
+  /estimate_cost:
+    post:
+      summary: Estimate cost for an item and quantity
+      operationId: estimateCost
+      description: >
+        Returns estimated cost for requested quantity.
+        Used by FinanceAgent for planning.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EstimateCostRequest"
+      responses:
+        "200":
+          description: Cost estimation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EstimateCostResponse"
+
+  /approve_budget:
+    post:
+      summary: Approve or reject budget for an order
+      operationId: approveBudget
+      description: >
+        Used by FinanceAgent to approve or reject supply orders.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveBudgetRequest"
+      responses:
+        "200":
+          description: Budget approval result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveBudgetResponse"
+
+  # =====================================================
+  # Logistics
+  # =====================================================
+  /get_shipping_options:
+    post:
+      summary: Get shipping options
+      operationId: getShippingOptions
+      description: >
+        Returns available shipping options for logistics planning.
+      responses:
+        "200":
+          description: Shipping options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShippingOptionsResponse"
+
+  /execute_shipment:
+    post:
+      summary: Execute shipment for an order
+      operationId: executeShipment
+      description: >
+        Executes shipment after finance approval.
+        Used by LogisticsAgent.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteShipmentRequest"
+      responses:
+        "200":
+          description: Shipment execution result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteShipmentResponse"
+
+  # =====================================================
+  # Supply Tickets
+  # =====================================================
+  /submit_supply_request:
+    post:
+      summary: Create supply ticket
+      operationId: submitSupplyRequest
+      description: >
+        Creates a new supply order ticket.
+        Used only when user explicitly requests procurement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketRequest"
+      responses:
+        "200":
+          description: Ticket created
           content:
             application/json:
               schema:
@@ -59,37 +157,36 @@ paths:
     get:
       summary: Get supply ticket status
       operationId: getSupplyStatus
-      description: >
-        Fetches the current status and metadata of a supply chain ticket.
       parameters:
         - name: order_id
           in: query
           required: true
           schema:
             type: string
-            example: ORD-AB12CD34
       responses:
         "200":
-          description: Current ticket status
+          description: Supply ticket status
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SupplyStatusResponse"
 
     post:
-      summary: Get supply ticket status (agent-friendly)
+      summary: Get supply ticket status (agent-safe)
       operationId: getSupplyStatusPost
-      description: >
-        Agent-safe POST variant for fetching supply ticket status.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/GetStatusRequest"
+              type: object
+              required: [order_id]
+              properties:
+                order_id:
+                  type: string
       responses:
         "200":
-          description: Current ticket status
+          description: Supply ticket status
           content:
             application/json:
               schema:
@@ -97,11 +194,11 @@ paths:
 
   /update_supply_status:
     post:
-      summary: Update supply ticket lifecycle
+      summary: Update supply ticket fields
       operationId: updateSupplyStatus
       description: >
-        Used by Inventory, Finance, and Logistics agents to update
-        ticket lifecycle and metadata.
+        Generic update endpoint used by Inventory, Finance,
+        and Logistics agents to update ticket metadata.
       requestBody:
         required: true
         content:
@@ -114,95 +211,141 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UpdateStatusResponse"
+                type: object
+                properties:
+                  ok:
+                    type: boolean
 
 components:
   schemas:
+    InventoryResponse:
+      type: object
+      properties:
+        item:
+          type: string
+        available:
+          type: boolean
+        quantity:
+          type: integer
+        unit:
+          type: string
+
+    EstimateCostRequest:
+      type: object
+      required: [item_id, quantity]
+      properties:
+        item_id:
+          type: string
+        quantity:
+          type: integer
+
+    EstimateCostResponse:
+      type: object
+      properties:
+        item_id:
+          type: string
+        quantity:
+          type: integer
+        unit_price:
+          type: number
+        estimated_cost:
+          type: number
+
+    ApproveBudgetRequest:
+      type: object
+      required: [order_id, approved]
+      properties:
+        order_id:
+          type: string
+        approved:
+          type: boolean
+
+    ApproveBudgetResponse:
+      type: object
+      properties:
+        approved:
+          type: boolean
+
+    ShippingOptionsResponse:
+      type: object
+      properties:
+        options:
+          type: array
+          items:
+            type: object
+            properties:
+              carrier:
+                type: string
+              eta_days:
+                type: integer
+              cost:
+                type: number
+
+    ExecuteShipmentRequest:
+      type: object
+      required: [order_id, carrier]
+      properties:
+        order_id:
+          type: string
+        carrier:
+          type: string
+
+    ExecuteShipmentResponse:
+      type: object
+      properties:
+        shipped:
+          type: boolean
+
+    CreateTicketRequest:
+      type: object
+      required: [requester_id, item_id, quantity]
+      properties:
+        requester_id:
+          type: string
+        item_id:
+          type: string
+        quantity:
+          type: integer
+
     CreateTicketResponse:
       type: object
       properties:
         order_id:
           type: string
-          example: ORD-AB12CD34
         status:
           type: string
-          example: created
         assistant_reply:
           type: string
-          example: Your supply request has been logged.
-
-    GetStatusRequest:
-      type: object
-      required:
-        - order_id
-      properties:
-        order_id:
-          type: string
-          example: ORD-AB12CD34
 
     UpdateStatusRequest:
       type: object
-      required:
-        - order_id
-        - updates
+      required: [order_id, updates]
       properties:
         order_id:
           type: string
-          example: ORD-AB12CD34
         updates:
           type: object
-          description: Partial update to the ticket document
-          example:
-            status: inventory_checked
-            inventory:
-              available: true
-              available_qty: 120
-
-    UpdateStatusResponse:
-      type: object
-      properties:
-        ok:
-          type: boolean
-          example: true
 
     SupplyStatusResponse:
       type: object
       properties:
         order_id:
           type: string
-          example: ORD-AB12CD34
         current_status:
           type: string
-          example: inventory_checked
         item_id:
           type: string
-          example: ITEM-001
         quantity:
           type: integer
-          example: 20
         inventory:
           type: object
           nullable: true
-          example:
-            available: true
-            available_qty: 120
         estimated_cost:
           type: object
           nullable: true
-          example:
-            unit_price: 1500
-            total: 30000
-            currency: INR
         approval_status:
           type: object
           nullable: true
-          example:
-            approved: true
-            approved_by: finance-agent
         shipment:
           type: object
           nullable: true
-          example:
-            carrier: BlueDart
-            tracking_id: BD12345
-            eta: 2026-01-16
