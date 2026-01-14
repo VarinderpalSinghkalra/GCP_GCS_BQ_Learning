@@ -21,6 +21,16 @@ gcloud functions deploy update_supply_status \
   --entry-point update_supply_status \
   --region us-central1
 
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/supply_chain_ticket_agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requester_id": "user_local_test",
+    "item_id": "ITEM-LOCAL-001",
+    "quantity": 5
+  }'
+
+
 
 
  curl -X POST \
