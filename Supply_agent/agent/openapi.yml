@@ -1,0 +1,164 @@
+openapi: 3.0.3
+
+info:
+  title: Supply Chain Ticket Agent API
+  description: >
+    Conversational, ticket-based Supply Chain API.
+    Compatible with Google Vertex AI Conversational Agents and ADK tools.
+
+    Guarantees:
+    - Always returns HTTP 200
+    - Always returns valid JSON
+    - Never crashes the agent
+  version: "1.0.0"
+
+servers:
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+
+paths:
+  /supply_chain_ticket_agent:
+    post:
+      summary: Create supply chain ticket
+      operationId: createSupplyTicket
+      description: >
+        Creates a new supply chain ticket.
+        Entry point for conversational agents.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - requester_id
+                - item_id
+                - quantity
+              properties:
+                requester_id:
+                  type: string
+                  description: User or system requesting the supply
+                item_id:
+                  type: string
+                  description: Item identifier
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  order_id:
+                    type: string
+                    example: ORD-AB12CD34
+                  status:
+                    type: string
+                    example: created
+                  assistant_reply:
+                    type: string
+                    example: Your supply request has been logged.
+
+  /get_supply_status:
+    get:
+      summary: Get supply ticket status
+      operationId: getSupplyStatus
+      parameters:
+        - name: order_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current supply ticket status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplyStatusResponse"
+
+    post:
+      summary: Get supply ticket status (agent-friendly)
+      operationId: getSupplyStatusPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - order_id
+              properties:
+                order_id:
+                  type: string
+      responses:
+        "200":
+          description: Current supply ticket status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplyStatusResponse"
+
+  /update_supply_status:
+    post:
+      summary: Update supply ticket lifecycle
+      operationId: updateSupplyStatus
+      description: >
+        Used by Inventory, Finance (A2A), and Logistics agents
+        to update ticket state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - order_id
+                - updates
+              properties:
+                order_id:
+                  type: string
+                updates:
+                  type: object
+                  description: Partial update to ticket document
+      responses:
+        "200":
+          description: Update accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+
+components:
+  schemas:
+    SupplyStatusResponse:
+      type: object
+      properties:
+        order_id:
+          type: string
+          example: ORD-AB12CD34
+        current_status:
+          type: string
+          example: inventory_checked
+        item_id:
+          type: string
+        quantity:
+          type: integer
+        inventory:
+          type: object
+          nullable: true
+        estimated_cost:
+          type: object
+          nullable: true
+        approval_status:
+          type: object
+          nullable: true
+        shipment:
+          type: object
+          nullable: true
