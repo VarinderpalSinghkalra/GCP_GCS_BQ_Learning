@@ -2,6 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Supply Chain Ticket Agent API
+  version: "1.0.0"
   description: >
     Conversational, ticket-based Supply Chain API.
     Compatible with Google Vertex AI Conversational Agents and ADK tools.
@@ -10,7 +11,6 @@ info:
     - Always returns HTTP 200
     - Always returns valid JSON
     - Never crashes the agent
-  version: "1.0.0"
 
 servers:
   - url: https://us-central1-data-engineering-479617.cloudfunctions.net
@@ -21,8 +21,8 @@ paths:
       summary: Create supply chain ticket
       operationId: createSupplyTicket
       description: >
-        Creates a new supply chain ticket.
         Entry point for conversational agents.
+        Creates a new supply chain ticket and persists it in Firestore.
       requestBody:
         required: true
         content:
@@ -37,43 +37,40 @@ paths:
                 requester_id:
                   type: string
                   description: User or system requesting the supply
+                  example: user_123
                 item_id:
                   type: string
                   description: Item identifier
+                  example: ITEM-001
                 quantity:
                   type: integer
                   minimum: 1
+                  description: Requested quantity
+                  example: 20
       responses:
         "200":
-          description: Ticket created
+          description: Ticket successfully created
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  order_id:
-                    type: string
-                    example: ORD-AB12CD34
-                  status:
-                    type: string
-                    example: created
-                  assistant_reply:
-                    type: string
-                    example: Your supply request has been logged.
+                $ref: "#/components/schemas/CreateTicketResponse"
 
   /get_supply_status:
     get:
       summary: Get supply ticket status
       operationId: getSupplyStatus
+      description: >
+        Fetches the current status and metadata of a supply chain ticket.
       parameters:
         - name: order_id
           in: query
           required: true
           schema:
             type: string
+            example: ORD-AB12CD34
       responses:
         "200":
-          description: Current supply ticket status
+          description: Current ticket status
           content:
             application/json:
               schema:
@@ -82,20 +79,17 @@ paths:
     post:
       summary: Get supply ticket status (agent-friendly)
       operationId: getSupplyStatusPost
+      description: >
+        Agent-safe POST variant for fetching supply ticket status.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - order_id
-              properties:
-                order_id:
-                  type: string
+              $ref: "#/components/schemas/GetStatusRequest"
       responses:
         "200":
-          description: Current supply ticket status
+          description: Current ticket status
           content:
             application/json:
               schema:
@@ -106,37 +100,71 @@ paths:
       summary: Update supply ticket lifecycle
       operationId: updateSupplyStatus
       description: >
-        Used by Inventory, Finance (A2A), and Logistics agents
-        to update ticket state.
+        Used by Inventory, Finance, and Logistics agents to update
+        ticket lifecycle and metadata.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - order_id
-                - updates
-              properties:
-                order_id:
-                  type: string
-                updates:
-                  type: object
-                  description: Partial update to ticket document
+              $ref: "#/components/schemas/UpdateStatusRequest"
       responses:
         "200":
           description: Update accepted
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  ok:
-                    type: boolean
-                    example: true
+                $ref: "#/components/schemas/UpdateStatusResponse"
 
 components:
   schemas:
+    CreateTicketResponse:
+      type: object
+      properties:
+        order_id:
+          type: string
+          example: ORD-AB12CD34
+        status:
+          type: string
+          example: created
+        assistant_reply:
+          type: string
+          example: Your supply request has been logged.
+
+    GetStatusRequest:
+      type: object
+      required:
+        - order_id
+      properties:
+        order_id:
+          type: string
+          example: ORD-AB12CD34
+
+    UpdateStatusRequest:
+      type: object
+      required:
+        - order_id
+        - updates
+      properties:
+        order_id:
+          type: string
+          example: ORD-AB12CD34
+        updates:
+          type: object
+          description: Partial update to the ticket document
+          example:
+            status: inventory_checked
+            inventory:
+              available: true
+              available_qty: 120
+
+    UpdateStatusResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+
     SupplyStatusResponse:
       type: object
       properties:
@@ -148,17 +176,33 @@ components:
           example: inventory_checked
         item_id:
           type: string
+          example: ITEM-001
         quantity:
           type: integer
+          example: 20
         inventory:
           type: object
           nullable: true
+          example:
+            available: true
+            available_qty: 120
         estimated_cost:
           type: object
           nullable: true
+          example:
+            unit_price: 1500
+            total: 30000
+            currency: INR
         approval_status:
           type: object
           nullable: true
+          example:
+            approved: true
+            approved_by: finance-agent
         shipment:
           type: object
           nullable: true
+          example:
+            carrier: BlueDart
+            tracking_id: BD12345
+            eta: 2026-01-16
