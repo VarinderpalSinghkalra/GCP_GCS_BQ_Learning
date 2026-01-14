@@ -1,12 +1,47 @@
-<script>
-import { onSnapshot, collection } from "firebase/firestore";
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Supply Chain – Live Agent Trace</title>
+  <meta charset="utf-8" />
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-onSnapshot(
-  collection(db, "supply_orders/ORD-XXXX/agent_traces"),
-  (snapshot) => {
-    snapshot.docChanges().forEach(change => {
-      console.log("New event:", change.doc.data());
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "data-engineering-479617.firebaseapp.com",
+      projectId: "data-engineering-479617",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const orderId = new URLSearchParams(window.location.search).get("order_id");
+
+    const q = query(
+      collection(db, `supply_orders/${orderId}/agent_traces`),
+      orderBy("timestamp")
+    );
+
+    onSnapshot(q, (snapshot) => {
+      const log = document.getElementById("log");
+      log.innerHTML = "";
+      snapshot.forEach((doc) => {
+        const e = doc.data();
+        log.innerHTML += `<li><b>${e.agent}</b>: ${e.message}</li>`;
+      });
     });
-  }
-);
-</script>
+  </script>
+</head>
+
+<body>
+  <h2>Live Agent Trace</h2>
+  <p>Order ID: <b id="order"></b></p>
+  <ul id="log"></ul>
+
+  <script>
+    document.getElementById("order").innerText =
+      new URLSearchParams(window.location.search).get("order_id");
+  </script>
+</body>
+</html>
