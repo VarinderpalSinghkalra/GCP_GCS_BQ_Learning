@@ -1,0 +1,12 @@
+<script>
+import { onSnapshot, collection } from "firebase/firestore";
+
+onSnapshot(
+  collection(db, "supply_orders/ORD-XXXX/agent_traces"),
+  (snapshot) => {
+    snapshot.docChanges().forEach(change => {
+      console.log("New event:", change.doc.data());
+    });
+  }
+);
+</script>
