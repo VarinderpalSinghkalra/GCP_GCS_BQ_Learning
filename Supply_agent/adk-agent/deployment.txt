@@ -1,3 +1,13 @@
+gcloud services enable \
+  run.googleapis.com \
+  aiplatform.googleapis.com \
+  cloudbuild.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com
+
+
+
+
 gcloud run deploy supply-chain-agent \
   --source . \
   --region us-central1 \
