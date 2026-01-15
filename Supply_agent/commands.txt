@@ -3,6 +3,15 @@ gcloud services enable \
   serviceusage.googleapis.com \
   iamcredentials.googleapis.com
 
+gcloud sql instances create inventory-db \
+  --database-version=POSTGRES_14 \
+  --cpu=1 \
+  --memory=3840MB \
+  --region=us-central1 \
+  --root-password=admin \
+  --availability-type=zonal
+
+
 
   gcloud sql instances describe inventory-db --format="value(state)"
 
