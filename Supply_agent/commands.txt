@@ -19,6 +19,9 @@ gcloud sql databases create inventory_db \
   --instance=inventory-db
 
 
-
   gcloud sql instances patch inventory-db \
   --authorized-networks=0.0.0.0/0
+
+
+wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.0/cloud-sql-proxy.linux.amd64 -O cloud-sql-proxy
+chmod +x cloud-sql-proxy
