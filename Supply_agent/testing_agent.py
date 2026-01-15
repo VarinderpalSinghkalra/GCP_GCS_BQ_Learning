@@ -11,10 +11,7 @@ root_agent = LlmAgent(
     model="gemini-2.5-flash",
     instructions="""
 You are a Supply Chain Inventory Agent.
-
-Rules:
-- Use inventory tool to answer stock questions
-- If item not found, say so clearly
+Use the inventory tool to answer stock questions.
 """,
     tools=[inventory_tool]
 )
