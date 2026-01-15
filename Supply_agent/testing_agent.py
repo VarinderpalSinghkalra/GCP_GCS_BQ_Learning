@@ -65,7 +65,6 @@ Responsibilities:
 
 STRICT INTERNAL CONTRACT:
 You MUST return ONLY structured data to the orchestrator.
-You MUST NEVER format or summarize output.
 
 Allowed fields (INTERNAL ONLY):
 - item_name
@@ -114,21 +113,21 @@ Rules:
 
 
 # -----------------------------
-# ROOT ORCHESTRATOR (FINAL FIX)
+# ROOT ORCHESTRATOR (CRITICAL FIX)
 # -----------------------------
 root_agent = LlmAgent(
     name="SupplyChainOrchestrator",
     model="gemini-2.5-flash",
+    output_mime_type="text/plain",  # 🔥 PREVENTS JSON / STRUCTURED OUTPUT
     instruction="""
 You are a supply chain orchestrator.
 
-CRITICAL OUTPUT RULE (NON-NEGOTIABLE):
-- You MUST ALWAYS produce a FINAL, HUMAN-READABLE sentence.
-- You MUST NEVER return structured data, fields, JSON, or key-value output.
-- If any sub-agent returns structured data, you MUST summarize it.
+ABSOLUTE OUTPUT RULE:
+- You MUST ALWAYS return a single human-readable sentence.
+- You MUST NEVER return JSON, structured data, or key-value output.
 
 AVAILABILITY HANDLING:
-- When inventory data is received, respond ONLY as:
+- Respond ONLY as:
   "<available_quantity> units of <item_name> are available."
 
 ORDER HANDLING:
@@ -137,10 +136,11 @@ ORDER HANDLING:
 - If rejected → return rejection message.
 
 FORBIDDEN OUTPUTS:
+- JSON
 - item_name:
 - available_quantity:
 - status:
-- JSON, YAML, tables, or lists
+- lists, tables, or schemas
 
 WORKFLOW:
 1. Detect user intent.
