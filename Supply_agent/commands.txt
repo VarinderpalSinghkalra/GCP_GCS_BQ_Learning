@@ -15,6 +15,10 @@ gcloud sql instances create inventory-db \
 
   gcloud sql instances describe inventory-db --format="value(state)"
 
+gcloud sql databases create inventory_db \
+  --instance=inventory-db
+
+
 
   gcloud sql instances patch inventory-db \
   --authorized-networks=0.0.0.0/0
