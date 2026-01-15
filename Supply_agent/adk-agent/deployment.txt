@@ -7,5 +7,13 @@ gcloud run deploy supply-chain-agent \
   --set-secrets DATABASE_URL=inventory-db-url:latest
 
 
+gcloud run deploy finance-agent \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated
+
+
+
+
 
     
