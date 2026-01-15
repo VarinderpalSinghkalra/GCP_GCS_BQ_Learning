@@ -25,3 +25,10 @@ gcloud sql databases create inventory_db \
 
 wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.0/cloud-sql-proxy.linux.amd64 -O cloud-sql-proxy
 chmod +x cloud-sql-proxy
+
+
+./cloud-sql-proxy \
+  <NEW_PROJECT_ID>:us-central1:inventory-db \
+  --address=127.0.0.1 \
+  --port=5432
+
