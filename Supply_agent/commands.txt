@@ -1,0 +1,11 @@
+gcloud services enable \
+  sqladmin.googleapis.com \
+  serviceusage.googleapis.com \
+  iamcredentials.googleapis.com
+
+
+  gcloud sql instances describe inventory-db --format="value(state)"
+
+
+  gcloud sql instances patch inventory-db \
+  --authorized-networks=0.0.0.0/0
