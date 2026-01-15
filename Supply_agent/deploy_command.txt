@@ -1,1 +1,9 @@
+./cloud-sql-proxy \
+  <PROJECT_ID>:us-central1:inventory-db \
+  --address=127.0.0.1 \
+  --port=5432
+
+
+
+
 adk run SupplyChain
