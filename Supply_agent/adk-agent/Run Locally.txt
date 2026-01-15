@@ -1,0 +1,9 @@
+export DATABASE_URL="postgresql://postgres:password@localhost:5432/inventory_db"
+uvicorn app:app --reload --port 8080
+
+
+
+
+curl -X POST http://localhost:8080/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Check inventory for screws"}'
