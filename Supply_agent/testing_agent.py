@@ -6,109 +6,129 @@ from google.adk.tools.google_search_tool import GoogleSearchTool
 from .inventory_tools import get_inventory_by_name
 
 
-# -----------------------------
-# FINAL RESPONSE TOOL (CRITICAL)
-# -----------------------------
+# =========================================================
+# FINAL RESPONSE TOOL (ONLY USER OUTPUT)
+# =========================================================
 def final_response(message: str) -> str:
-    """
-    This tool MUST be called last.
-    Whatever this returns is sent to the user.
-    """
     return message
 
 
-# -----------------------------
-# LOGISTICS SEARCH AGENT
-# -----------------------------
-logistics_search_agent = LlmAgent(
-    name="logistics_search_agent",
-    model="gemini-2.5-flash",
-    instruction="""
-You are a logistics research agent.
-Only perform web searches.
-Do not interact with inventory or finance.
-""",
-    tools=[GoogleSearchTool()],
-)
-
-
-# -----------------------------
-# LOGISTICS AGENT
-# -----------------------------
-logistics_agent = LlmAgent(
-    name="logistics_agent",
-    model="gemini-2.5-flash",
-    instruction="""
-You are a logistics coordinator.
-Execute shipment ONLY after approval.
-""",
-    tools=[agent_tool.AgentTool(agent=logistics_search_agent)],
-)
-
-
-# -----------------------------
-# INVENTORY AGENT (INTERNAL ONLY)
-# -----------------------------
+# =========================================================
+# INVENTORY AGENT (INTERNAL / SILENT)
+# =========================================================
 inventory_agent = LlmAgent(
     name="inventory_agent",
     model="gemini-2.5-flash",
     instruction="""
-You are an inventory agent.
-
-Rules (STRICT):
-- ALWAYS call get_inventory_by_name.
-- Return structured data ONLY to the orchestrator.
-- NEVER speak to the end user.
+Always call get_inventory_by_name.
+Return the tool output exactly as received.
+Never format text.
+Never speak to the user.
 """,
     tools=[FunctionTool(get_inventory_by_name)],
 )
 
 
-# -----------------------------
-# FINANCE AGENT (QUANTITY ONLY)
-# -----------------------------
+# =========================================================
+# FINANCE AGENT (BUSINESS ETHICAL / SILENT)
+# =========================================================
 finance_agent = LlmAgent(
     name="finance_agent",
     model="gemini-2.5-flash",
     instruction="""
-Approval rules:
-- If quantity < 100 units → REJECT.
-- Otherwise → APPROVE.
+You are a finance approval authority.
 
-Return ONLY a decision message.
+Policy:
+- Orders below 100 units are not cost-effective.
+- Orders of 100 units or more are financially justified.
+
+Return EXACTLY one sentence:
+
+If not approved:
+"After financial review, the requested order does not meet procurement cost-efficiency guidelines."
+
+If approved:
+"Financial review completed successfully and the order is approved for further processing."
+
+Never speak to the end user.
 """,
 )
 
 
-# -----------------------------
-# ROOT ORCHESTRATOR (FIXED)
-# -----------------------------
+# =========================================================
+# LOGISTICS SEARCH AGENT
+# =========================================================
+logistics_search_agent = LlmAgent(
+    name="logistics_search_agent",
+    model="gemini-2.5-flash",
+    instruction="""
+Provide shipping and delivery options when requested.
+""",
+    tools=[GoogleSearchTool()],
+)
+
+
+# =========================================================
+# LOGISTICS AGENT (INTERNAL / SILENT)
+# =========================================================
+logistics_agent = LlmAgent(
+    name="logistics_agent",
+    model="gemini-2.5-flash",
+    instruction="""
+Handle logistics ONLY after financial approval.
+Never speak to the user.
+""",
+    tools=[agent_tool.AgentTool(agent=logistics_search_agent)],
+)
+
+
+# =========================================================
+# ROOT ORCHESTRATOR (ONLY SPEAKER)
+# =========================================================
 root_agent = LlmAgent(
     name="SupplyChainOrchestrator",
     model="gemini-2.5-flash",
     instruction="""
-You are the root supply chain orchestrator.
+You are the Supply Chain Orchestrator and the ONLY agent allowed to respond to the user.
 
-ABSOLUTE RULES (NON-NEGOTIABLE):
-- You MUST ALWAYS finish by calling final_response(...).
-- You MUST NEVER return raw tool outputs or JSON.
-- If you receive inventory data, you MUST summarize it.
+ABSOLUTE RULES:
+- You MUST always call final_response(message) as the last step.
+- You MUST NEVER return JSON, lists, or tool outputs.
 
-AVAILABILITY HANDLING:
-When inventory data is received in this form:
-{
-  item_name: <string>,
-  quantity: <number>,
-  status: <string>
-}
+====================
+INVENTORY HANDLING
+====================
+Inventory tool may return:
+1) A STRING → inventory not found
+2) A LIST of inventory records
 
-You MUST respond ONLY as:
-final_response("<quantity> units of <item_name> are available.")
+RULES:
+- If STRING:
+    final_response(the string exactly as received)
 
-FORBIDDEN:
-- Returning get_inventory_by_name_response
-- Returning JSON, lists, or key-value pairs
-- Exposing tool or agent internals
+- If LIST:
+    - Take ONLY the FIRST item
+    - Extract item_name and quantity
+    - Respond ONLY as:
+      final_response("<quantity> units of <item_name> are available.")
+
+====================
+ORDER HANDLING
+====================
+1. Send requested quantity to finance_agent
+
+2. If finance response indicates NOT approved:
+   Return the finance justification using final_response
+
+3. If finance response indicates approval:
+   - Route request to logistics_agent
+   - Respond ONLY with:
+     final_response(
+       "The order for <quantity> units of <item_name> has been approved following financial review and is now being processed for shipment."
+     )
+
+Never explain internal reasoning.
+Never expose agent or tool behavior.
 """,
     tools=[FunctionTool(final_response)],
     sub_agents=[
