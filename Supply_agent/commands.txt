@@ -36,3 +36,6 @@ psql -h 127.0.0.1 -p 5432 -U postgres -d inventory_db
   --address=127.0.0.1 \
   --port=5432
 
+
+psql -h 127.0.0.1 -p 5432 -U postgres -d inventory_db
+
