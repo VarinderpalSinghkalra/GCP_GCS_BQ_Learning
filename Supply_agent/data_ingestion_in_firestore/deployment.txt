@@ -1,1 +1,7 @@
 python seed_inventory.py
+
+
+python - <<EOF
+from google.cloud import firestore
+print("OK")
+EOF
