@@ -54,3 +54,27 @@ CREATE TABLE inventory (
 );
 
 
+INSERT INTO inventory (item_name, sku, quantity, warehouse_id) VALUES
+('screws', 'screws', 2500, 'DEFAULT-WH'),
+('bolts', 'bolts', 1800, 'DEFAULT-WH'),
+('nuts', 'nuts', 3000, 'DEFAULT-WH'),
+('washers', 'washers', 2200, 'DEFAULT-WH'),
+('nails', 'nails', 5000, 'DEFAULT-WH'),
+('hinges', 'hinges', 400, 'DEFAULT-WH'),
+('anchors', 'anchors', 900, 'DEFAULT-WH'),
+('rivets', 'rivets', 1200, 'DEFAULT-WH'),
+('clamps', 'clamps', 350, 'DEFAULT-WH'),
+('brackets', 'brackets', 800, 'DEFAULT-WH'),
+('springs', 'springs', 650, 'DEFAULT-WH'),
+('gaskets', 'gaskets', 1400, 'DEFAULT-WH'),
+('o_rings', 'o_rings', 2000, 'DEFAULT-WH'),
+('bearings', 'bearings', 300, 'DEFAULT-WH'),
+('couplings', 'couplings', 270, 'DEFAULT-WH'),
+('valves', 'valves', 180, 'DEFAULT-WH'),
+('pipes', 'pipes', 500, 'DEFAULT-WH'),
+('fittings', 'fittings', 1200, 'DEFAULT-WH'),
+('cables', 'cables', 1000, 'DEFAULT-WH'),
+('switches', 'switches', 600, 'DEFAULT-WH'),
+('connectors', 'connectors', 1600, 'DEFAULT-WH');
+
+
