@@ -3,6 +3,7 @@ from psycopg2.pool import SimpleConnectionPool
 
 _POOL = None
 
+
 def get_pool():
     global _POOL
     if _POOL is None:
@@ -20,7 +21,7 @@ def get_pool():
 
 
 def get_inventory_by_name(name: str):
-    pool = get_pool()
+    pool = get_pool()              # ← ONLY HERE
     conn = pool.getconn()
     try:
         with conn.cursor() as cur:
