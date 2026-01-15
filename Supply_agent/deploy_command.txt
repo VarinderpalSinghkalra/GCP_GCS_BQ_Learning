@@ -4,3 +4,5 @@ export GOOGLE_CLOUD_LOCATION=asia-south1
 
 
 fuser -k 8000/tcp
+
+adk web agents
