@@ -19,4 +19,4 @@ export GOOGLE_CLOUD_LOCATION=asia-south1
 
 
 
-adk run SupplyChain
+adk web agents
