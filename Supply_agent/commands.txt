@@ -78,3 +78,7 @@ INSERT INTO inventory (item_name, sku, quantity, warehouse_id) VALUES
 ('connectors', 'connectors', 1600, 'DEFAULT-WH');
 
 
+SELECT * FROM inventory;
+
+
+
