@@ -7,6 +7,14 @@ from .inventory_tools import get_inventory_by_name
 
 
 # -----------------------------
+# FINAL RESPONSE TOOL (REQUIRED)
+# -----------------------------
+def final_response(message: str) -> str:
+    """Return the final user-facing response."""
+    return message
+
+
+# -----------------------------
 # LOGISTICS SEARCH AGENT
 # -----------------------------
 logistics_search_agent = LlmAgent(
@@ -14,16 +22,7 @@ logistics_search_agent = LlmAgent(
     model="gemini-2.5-flash",
     instruction="""
 You are a logistics research agent.
-
-Responsibilities:
-- Search the web for shipping providers and routes.
-
-Rules:
-- Only perform web searches.
-- Do NOT approve finances.
-- Do NOT execute shipments.
-- Do NOT interact with inventory data.
-- Do NOT expose raw search results.
+Only perform web searches.
 """,
     tools=[GoogleSearchTool()],
 )
@@ -37,22 +36,14 @@ logistics_agent = LlmAgent(
     model="gemini-2.5-flash",
     instruction="""
 You are a logistics coordinator.
-
-Responsibilities:
-- Execute shipment ONLY after approval.
-
-Rules:
-- Use logistics_search_agent.
-- Do NOT approve costs.
-- Do NOT check inventory.
-- Do NOT expose internal data.
+Execute shipment ONLY after approval.
 """,
     tools=[agent_tool.AgentTool(agent=logistics_search_agent)],
 )
 
 
 # -----------------------------
-# INVENTORY AGENT (STRICT – INTERNAL ONLY)
+# INVENTORY AGENT (INTERNAL ONLY)
 # -----------------------------
 inventory_agent = LlmAgent(
     name="inventory_agent",
@@ -60,24 +51,8 @@ inventory_agent = LlmAgent(
     instruction="""
 You are an inventory agent.
 
-Responsibilities:
-- Retrieve item availability by name or ID.
-
-STRICT INTERNAL CONTRACT:
-You MUST return ONLY structured data to the orchestrator.
-
-Allowed fields (INTERNAL ONLY):
-- item_name
-- available_quantity
-- status
-
-Rules:
-- DO NOT greet.
-- DO NOT ask questions.
-- DO NOT approve finances.
-- DO NOT manage logistics.
-- ALWAYS call get_inventory_by_name.
-- NEVER speak to the end user.
+Return structured availability data ONLY to the orchestrator.
+Never speak to the end user.
 """,
     tools=[FunctionTool(get_inventory_by_name)],
 )
@@ -90,64 +65,35 @@ finance_agent = LlmAgent(
     name="finance_agent",
     model="gemini-2.5-flash",
     instruction="""
-You are a financial approval agent.
-
-DECISION RULES (STRICT):
-
-- If order quantity is LESS THAN 100 units → REJECT.
-- If order quantity is 100 units or more → APPROVE.
-
-REJECTION MESSAGE:
-"The request is rejected because the order quantity is below the minimum approval threshold."
-
-APPROVAL MESSAGE:
-"The request meets the quantity requirements and is approved."
-
-Rules:
-- DO NOT check inventory.
-- DO NOT check cost.
-- DO NOT execute logistics.
-- ALWAYS return a clear decision.
+Reject if quantity < 100 units.
+Approve otherwise.
 """,
 )
 
 
 # -----------------------------
-# ROOT ORCHESTRATOR (CRITICAL FIX)
+# ROOT ORCHESTRATOR (VALID)
 # -----------------------------
 root_agent = LlmAgent(
     name="SupplyChainOrchestrator",
     model="gemini-2.5-flash",
-    output_mime_type="text/plain",  # 🔥 PREVENTS JSON / STRUCTURED OUTPUT
     instruction="""
 You are a supply chain orchestrator.
 
-ABSOLUTE OUTPUT RULE:
-- You MUST ALWAYS return a single human-readable sentence.
-- You MUST NEVER return JSON, structured data, or key-value output.
+MANDATORY RULES:
+- NEVER return structured data.
+- ALWAYS finish by calling final_response(...) with plain text.
 
-AVAILABILITY HANDLING:
-- Respond ONLY as:
-  "<available_quantity> units of <item_name> are available."
+Availability handling:
+- If inventory data is received, respond using:
+  final_response("<available_quantity> units of <item_name> are available.")
 
-ORDER HANDLING:
-- Validate quantity using FinanceAgent.
-- If approved → proceed to logistics.
-- If rejected → return rejection message.
-
-FORBIDDEN OUTPUTS:
+Do not expose:
 - JSON
-- item_name:
-- available_quantity:
-- status:
-- lists, tables, or schemas
-
-WORKFLOW:
-1. Detect user intent.
-2. Call InventoryAgent (internal).
-3. Summarize result in one sentence.
-4. End the response.
+- key-value pairs
+- internal agent outputs
 """,
+    tools=[FunctionTool(final_response)],
     sub_agents=[
         inventory_agent,
         finance_agent,
