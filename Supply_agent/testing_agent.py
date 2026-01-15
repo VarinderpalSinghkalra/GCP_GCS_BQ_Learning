@@ -7,10 +7,13 @@ from .inventory_tools import get_inventory_by_name
 
 
 # -----------------------------
-# FINAL RESPONSE TOOL (REQUIRED)
+# FINAL RESPONSE TOOL (CRITICAL)
 # -----------------------------
 def final_response(message: str) -> str:
-    """Return the final user-facing response."""
+    """
+    This tool MUST be called last.
+    Whatever this returns is sent to the user.
+    """
     return message
 
 
@@ -23,6 +26,7 @@ logistics_search_agent = LlmAgent(
     instruction="""
 You are a logistics research agent.
 Only perform web searches.
+Do not interact with inventory or finance.
 """,
     tools=[GoogleSearchTool()],
 )
@@ -51,8 +55,10 @@ inventory_agent = LlmAgent(
     instruction="""
 You are an inventory agent.
 
-Return structured availability data ONLY to the orchestrator.
-Never speak to the end user.
+Rules (STRICT):
+- ALWAYS call get_inventory_by_name.
+- Return structured data ONLY to the orchestrator.
+- NEVER speak to the end user.
 """,
     tools=[FunctionTool(get_inventory_by_name)],
 )
@@ -65,33 +71,44 @@ finance_agent = LlmAgent(
     name="finance_agent",
     model="gemini-2.5-flash",
     instruction="""
-Reject if quantity < 100 units.
-Approve otherwise.
+Approval rules:
+- If quantity < 100 units → REJECT.
+- Otherwise → APPROVE.
+
+Return ONLY a decision message.
 """,
 )
 
 
 # -----------------------------
-# ROOT ORCHESTRATOR (VALID)
+# ROOT ORCHESTRATOR (FIXED)
 # -----------------------------
 root_agent = LlmAgent(
     name="SupplyChainOrchestrator",
     model="gemini-2.5-flash",
     instruction="""
-You are a supply chain orchestrator.
+You are the root supply chain orchestrator.
 
-MANDATORY RULES:
-- NEVER return structured data.
-- ALWAYS finish by calling final_response(...) with plain text.
+ABSOLUTE RULES (NON-NEGOTIABLE):
+- You MUST ALWAYS finish by calling final_response(...).
+- You MUST NEVER return raw tool outputs or JSON.
+- If you receive inventory data, you MUST summarize it.
 
-Availability handling:
-- If inventory data is received, respond using:
-  final_response("<available_quantity> units of <item_name> are available.")
+AVAILABILITY HANDLING:
+When inventory data is received in this form:
+{
+  item_name: <string>,
+  quantity: <number>,
+  status: <string>
+}
 
-Do not expose:
-- JSON
-- key-value pairs
-- internal agent outputs
+You MUST respond ONLY as:
+final_response("<quantity> units of <item_name> are available.")
+
+FORBIDDEN:
+- Returning get_inventory_by_name_response
+- Returning JSON, lists, or key-value pairs
+- Exposing tool or agent internals
 """,
     tools=[FunctionTool(final_response)],
     sub_agents=[
