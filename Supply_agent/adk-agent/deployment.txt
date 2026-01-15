@@ -12,9 +12,10 @@ gcloud run deploy supply-chain-agent \
   --source . \
   --region us-central1 \
   --allow-unauthenticated \
-  --add-cloudsql-instances PROJECT_ID:us-central1:inventory-db \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=PROJECT_ID \
+  --add-cloudsql-instances data-engineering-479617:us-central1:inventory-db \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=data-engineering-479617 \
   --set-secrets DATABASE_URL=inventory-db-url:latest
+
 
 
 gcloud run deploy finance-agent \
