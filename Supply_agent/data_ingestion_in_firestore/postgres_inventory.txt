@@ -1,0 +1,41 @@
+gcloud services enable sqladmin.googleapis.com
+
+gcloud sql instances create inventory-postgres \
+  --database-version=POSTGRES_15 \
+  --tier=db-custom-1-3840 \
+  --region=us-central1 \
+  --storage-size=20GB \
+  --storage-type=SSD \
+  --availability-type=zonal
+
+gcloud sql users set-password postgres \
+  --instance=inventory-postgres \
+  --password=StrongPassword123
+
+gcloud sql databases create supply_chain \
+  --instance=inventory-postgres
+
+gcloud sql connect inventory-postgres --user=postgres
+
+CREATE DATABASE supply_chain1 ;
+
+\c supply_chain1
+
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE inventory (
+    item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_name TEXT NOT NULL,
+    sku TEXT UNIQUE NOT NULL,
+    quantity INT NOT NULL CHECK (quantity >= 0),
+    warehouse_id TEXT NOT NULL,
+    status TEXT DEFAULT 'AVAILABLE',
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+\d inventory;
+
+
+
+
+
