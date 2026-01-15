@@ -1,3 +1,6 @@
 export GOOGLE_GENAI_USE_VERTEXAI=true
 export GOOGLE_CLOUD_PROJECT=platform-support-analyst-57565
 export GOOGLE_CLOUD_LOCATION=asia-south1
+
+
+fuser -k 8000/tcp
