@@ -1,1 +1,107 @@
+test_curl.sh
+
+#!/bin/bash
+
+ORCHESTRATOR_URL="https://orchestrator-agent-platform-support-analyst-57565.us-central1.run.app"
+INVENTORY_URL="https://inventory-agent-platform-support-analyst-57565.us-central1.run.app"
+FINANCE_URL="https://finance-agent-platform-support-analyst-57565.us-central1.run.app"
+LOGISTICS_URL="https://logistics-agent-platform-support-analyst-57565.us-central1.run.app"
+
+echo "=============================="
+echo "1. INVENTORY SEARCH"
+echo "=============================="
+curl "$INVENTORY_URL/inventory/search?name=bolt"
+echo -e "\n"
+
+echo "=============================="
+echo "2. INVENTORY COST"
+echo "=============================="
+curl "$INVENTORY_URL/inventory/cost?item_id=REPLACE_UUID&quantity=10"
+echo -e "\n"
+
+echo "=============================="
+echo "3. FINANCE CHECK"
+echo "=============================="
+curl -X POST "$FINANCE_URL/finance/check" \
+  -H "Content-Type: application/json" \
+  -d '{"amount":55}'
+echo -e "\n"
+
+echo "=============================="
+echo "4. LOGISTICS EXECUTE"
+echo "=============================="
+curl -X POST "$LOGISTICS_URL/logistics/execute" \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":"REPLACE_UUID","approved":true}'
+echo -e "\n"
+
+echo "=============================="
+echo "5. ORCHESTRATOR (NO APPROVAL)"
+echo "=============================="
+curl -X POST "$ORCHESTRATOR_URL/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item": "bolt",
+    "quantity": 10
+  }'
+echo -e "\n"
+
+echo "=============================="
+echo "6. ORCHESTRATOR (WITH APPROVAL)"
+echo "=============================="
+curl -X POST "$ORCHESTRATOR_URL/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item": "bolt",
+    "quantity": 10,
+    "approval": true
+  }'
+echo -e "\n"
+
+
+⸻
+
+▶️ HOW TO USE
+
+chmod +x test_curl.sh
+./test_curl.sh
+
+👉 Replace REPLACE_UUID with the real item_id returned from step 1.
+
+⸻
+
+🧪 ONE-LINER CURLS (FOR QUICK TESTING)
+
+Inventory
+
+curl "https://inventory-agent-platform-support-analyst-57565.us-central1.run.app/inventory/search?name=bolt"
+
+Cost
+
+curl "https://inventory-agent-platform-support-analyst-57565.us-central1.run.app/inventory/cost?item_id=<UUID>&quantity=10"
+
+Finance
+
+curl -X POST https://finance-agent-platform-support-analyst-57565.us-central1.run.app/finance/check \
+  -H "Content-Type: application/json" \
+  -d '{"amount":55}'
+
+Logistics
+
+curl -X POST https://logistics-agent-platform-support-analyst-57565.us-central1.run.app/logistics/execute \
+  -H "Content-Type: application/json" \
+  -d '{"order_id":"<UUID>","approved":true}'
+
+Orchestrator (approval flow)
+
+curl -X POST https://orchestrator-agent-platform-support-analyst-57565.us-central1.run.app/query \
+  -H "Content-Type: application/json" \
+  -d '{"item":"bolt","quantity":10}'
+
+curl -X POST https://orchestrator-agent-platform-support-analyst-57565.us-central1.run.app/query \
+  -H "Content-Type: application/json" \
+  -d '{"item":"bolt","quantity":10,"approval":true}'
+
+
+⸻
 
