@@ -1,1 +1,126 @@
+ deploy_all.sh  ✅ (COPY–PASTE AS IS)
+
+#!/bin/bash
+set -e
+
+# =====================
+# BASIC CONFIG
+# =====================
+PROJECT_ID="platform-support-analyst-57565"
+REGION="us-central1"
+
+SQL_INSTANCE="inventory-db"
+DB_NAME="inventory_db"
+DB_USER="postgres"
+DB_PASS="admin"
+
+# =====================
+# SET PROJECT
+# =====================
+gcloud config set project $PROJECT_ID
+
+# =====================
+# ENABLE APIS
+# =====================
+gcloud services enable \
+  run.googleapis.com \
+  sqladmin.googleapis.com \
+  cloudbuild.googleapis.com \
+  aiplatform.googleapis.com
+
+# =====================
+# CLOUD SQL (POSTGRES)
+# =====================
+gcloud sql instances create $SQL_INSTANCE \
+  --database-version=POSTGRES_14 \
+  --region=$REGION \
+  --cpu=2 \
+  --memory=4GB || true
+
+gcloud sql databases create $DB_NAME \
+  --instance=$SQL_INSTANCE || true
+
+gcloud sql users set-password $DB_USER \
+  --instance=$SQL_INSTANCE \
+  --password=$DB_PASS
+
+# =====================
+# INVENTORY AGENT
+# =====================
+cd inventory-agent
+
+gcloud run deploy inventory-agent \
+  --source . \
+  --region $REGION \
+  --allow-unauthenticated \
+  --add-cloudsql-instances $PROJECT_ID:$REGION:$SQL_INSTANCE \
+  --set-env-vars \
+DB_HOST=/cloudsql/$PROJECT_ID:$REGION:$SQL_INSTANCE,\
+DB_NAME=$DB_NAME,\
+DB_USER=$DB_USER,\
+DB_PASS=$DB_PASS
+
+cd ..
+
+# =====================
+# FINANCE AGENT
+# =====================
+cd finance-agent
+
+gcloud run deploy finance-agent \
+  --source . \
+  --region $REGION \
+  --allow-unauthenticated
+
+cd ..
+
+# =====================
+# LOGISTICS AGENT
+# =====================
+cd logistics-agent
+
+gcloud run deploy logistics-agent \
+  --source . \
+  --region $REGION \
+  --allow-unauthenticated
+
+cd ..
+
+# =====================
+# ORCHESTRATOR AGENT
+# =====================
+cd orchestrator-agent
+
+gcloud run deploy orchestrator-agent \
+  --source . \
+  --region $REGION \
+  --allow-unauthenticated \
+  --set-env-vars \
+INV_URL=https://inventory-agent-$PROJECT_ID.$REGION.run.app,\
+FIN_URL=https://finance-agent-$PROJECT_ID.$REGION.run.app,\
+LOG_URL=https://logistics-agent-$PROJECT_ID.$REGION.run.app
+
+cd ..
+
+# =====================
+# DONE
+# =====================
+echo "===================================="
+echo "DEPLOYMENT COMPLETED SUCCESSFULLY"
+echo "===================================="
+
+echo "Inventory     : https://inventory-agent-$PROJECT_ID.$REGION.run.app"
+echo "Finance       : https://finance-agent-$PROJECT_ID.$REGION.run.app"
+echo "Logistics     : https://logistics-agent-$PROJECT_ID.$REGION.run.app"
+echo "Orchestrator  : https://orchestrator-agent-$PROJECT_ID.$REGION.run.app"
+
+
+⸻
+
+▶️ HOW TO USE (ONLY 2 COMMANDS)
+
+chmod +x deploy_all.sh
+./deploy_all.sh
+
+
 
