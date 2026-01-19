@@ -1,89 +1,72 @@
 openapi: 3.0.0
 
 info:
-  title: Issue Status API
+  title: Access Request Status Update API
   version: "1.0.0"
   description: >
-    Read-only Issue Status API for Conversational Agents.
-    Used to fetch real-time ticket lifecycle status.
+    INTERNAL API for updating the lifecycle state
+    of an access request. Invoked by Cloud Tasks or
+    system orchestrators only.
+    Not intended for direct user or agent access.
 
 servers:
-  - url: https://get-issue-status-277069041958.us-central1.run.app
-    description: Issue Status Service
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
 
 paths:
-  /status:
-    get:
-      summary: Get current issue status
-      operationId: getIssueStatus
+  /update_access_request_status:
+    post:
+      summary: Update access request status (internal)
+      operationId: updateAccessRequestStatusInternal
       description: >
-        Returns the latest lifecycle status of an issue.
-        This endpoint is read-only and safe for agent access.
+        Updates the lifecycle status of an access request
+        in Firestore. This endpoint is called by Cloud Tasks
+        as part of automated provisioning workflows.
 
-      parameters:
-        - name: issue_id
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Unique issue identifier (e.g., AR-8F3A91C2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - request_id
+                - status
+              properties:
+                request_id:
+                  type: string
+                  description: Access request identifier
+                  example: AR-8F3A91C2
+                status:
+                  type: string
+                  description: new | assigned | in_progress | completed | failed
+                  example: completed
+                updated_by:
+                  type: string
+                  description: System or agent updating the status
+                  example: cloud_tasks
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: Optional diagnostic or audit metadata
 
       responses:
         "200":
-          description: Current issue status
+          description: Status update result
           content:
             application/json:
               schema:
                 type: object
                 required:
-                  - issue_id
-                  - current_status
-                  - last_updated_at
+                  - request_id
+                  - status
                 properties:
-                  issue_id:
+                  request_id:
                     type: string
                     example: AR-8F3A91C2
-
-                  current_status:
+                  status:
                     type: string
-                    enum:
-                      - new
-                      - assigned
-                      - in_progress
-                      - completed
                     example: completed
-
-                  priority:
+                  updated_at:
                     type: string
-                    enum:
-                      - low
-                      - medium
-                      - high
-                    example: high
-
-                  last_updated_at:
-                    type: string
-                    format: date-time
-                    example: "2026-01-19T17:08:42Z"
-
-        "404":
-          description: Issue not found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Issue not found
-
-        "500":
-          description: Internal error
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: Internal server error
+                    description: ISO-8601 timestamp
+                    example: "2026-01-19T06:47:12.456Z"
