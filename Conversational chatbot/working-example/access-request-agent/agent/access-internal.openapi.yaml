@@ -1,0 +1,48 @@
+openapi: 3.0.0
+
+info:
+  title: Access Request Internal API
+  version: "1.0.0"
+  description: >
+    Internal system API used by Cloud Tasks
+    to update access request lifecycle state.
+    Not intended for agent or user access.
+
+servers:
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+
+paths:
+  /update_access_request_status:
+    post:
+      summary: Update access request status (internal)
+      operationId: updateAccessRequestStatusInternal
+      description: >
+        INTERNAL ONLY. Invoked by Cloud Tasks.
+        Updates the lifecycle state of an access request.
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_id, status]
+              properties:
+                request_id:
+                  type: string
+                  example: AR-8F3A91C2
+                status:
+                  type: string
+                  enum: [assigned, in_progress, completed]
+
+      responses:
+        "200":
+          description: Internal acknowledgement
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
