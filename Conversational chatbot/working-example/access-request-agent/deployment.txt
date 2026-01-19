@@ -1,0 +1,32 @@
+gcloud pubsub topics create access-requests-topic
+
+gcloud tasks queues create access-request-queue \
+  --location us-central1
+
+
+
+gcloud functions deploy submit_access_request \
+  --gen2 \
+  --runtime python312 \
+  --region us-central1 \
+  --source . \
+  --entry-point submit_access_request \
+  --trigger-http \
+  --allow-unauthenticated
+
+
+gcloud functions deploy update_access_request_status \
+  --gen2 \
+  --runtime python312 \
+  --region us-central1 \
+  --source . \
+  --entry-point update_access_request_status \
+  --trigger-http \
+  --allow-unauthenticated
+
+curl -i -X POST "https://us-central1-data-engineering-479617.cloudfunctions.net/submit_access_request"   -H "Content-Type: application/json"   -d '{
+    "user_id": "emp_101",
+    "resource": "BigQuery Dataset",
+    "access_level": "read",
+    "justification": "Reporting access needed"
+  }'
