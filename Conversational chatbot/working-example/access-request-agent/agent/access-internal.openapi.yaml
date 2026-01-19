@@ -1,48 +1,89 @@
 openapi: 3.0.0
 
 info:
-  title: Access Request Internal API
+  title: Issue Status API
   version: "1.0.0"
   description: >
-    Internal system API used by Cloud Tasks
-    to update access request lifecycle state.
-    Not intended for agent or user access.
+    Read-only Issue Status API for Conversational Agents.
+    Used to fetch real-time ticket lifecycle status.
 
 servers:
-  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+  - url: https://get-issue-status-277069041958.us-central1.run.app
+    description: Issue Status Service
 
 paths:
-  /update_access_request_status:
-    post:
-      summary: Update access request status (internal)
-      operationId: updateAccessRequestStatusInternal
+  /status:
+    get:
+      summary: Get current issue status
+      operationId: getIssueStatus
       description: >
-        INTERNAL ONLY. Invoked by Cloud Tasks.
-        Updates the lifecycle state of an access request.
+        Returns the latest lifecycle status of an issue.
+        This endpoint is read-only and safe for agent access.
 
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [request_id, status]
-              properties:
-                request_id:
-                  type: string
-                  example: AR-8F3A91C2
-                status:
-                  type: string
-                  enum: [assigned, in_progress, completed]
+      parameters:
+        - name: issue_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Unique issue identifier (e.g., AR-8F3A91C2)
 
       responses:
         "200":
-          description: Internal acknowledgement
+          description: Current issue status
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - issue_id
+                  - current_status
+                  - last_updated_at
+                properties:
+                  issue_id:
+                    type: string
+                    example: AR-8F3A91C2
+
+                  current_status:
+                    type: string
+                    enum:
+                      - new
+                      - assigned
+                      - in_progress
+                      - completed
+                    example: completed
+
+                  priority:
+                    type: string
+                    enum:
+                      - low
+                      - medium
+                      - high
+                    example: high
+
+                  last_updated_at:
+                    type: string
+                    format: date-time
+                    example: "2026-01-19T17:08:42Z"
+
+        "404":
+          description: Issue not found
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  ok:
-                    type: boolean
-                    example: true
+                  error:
+                    type: string
+                    example: Issue not found
+
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Internal server error
