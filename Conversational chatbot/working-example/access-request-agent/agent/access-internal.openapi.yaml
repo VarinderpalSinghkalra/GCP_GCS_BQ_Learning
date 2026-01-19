@@ -1,72 +1,61 @@
 openapi: 3.0.0
 
 info:
-  title: Access Request Status Update API
+  title: Access Request Status API
   version: "1.0.0"
   description: >
-    INTERNAL API for updating the lifecycle state
-    of an access request. Invoked by Cloud Tasks or
-    system orchestrators only.
-    Not intended for direct user or agent access.
+    Read-only Access Request Status API for Conversational Agents.
+    Used to fetch real-time lifecycle status of access requests.
+    Always returns HTTP 200 with valid JSON.
 
 servers:
   - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+    description: Access Request Status Service
 
 paths:
-  /update_access_request_status:
-    post:
-      summary: Update access request status (internal)
-      operationId: updateAccessRequestStatusInternal
+  /get_access_request_status:
+    get:
+      summary: Get access request status
+      operationId: getAccessRequestStatus
       description: >
-        Updates the lifecycle status of an access request
-        in Firestore. This endpoint is called by Cloud Tasks
-        as part of automated provisioning workflows.
-
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - request_id
-                - status
-              properties:
-                request_id:
-                  type: string
-                  description: Access request identifier
-                  example: AR-8F3A91C2
-                status:
-                  type: string
-                  description: new | assigned | in_progress | completed | failed
-                  example: completed
-                updated_by:
-                  type: string
-                  description: System or agent updating the status
-                  example: cloud_tasks
-                metadata:
-                  type: object
-                  additionalProperties: true
-                  description: Optional diagnostic or audit metadata
-
+        Returns the current lifecycle status of an access request.
+        The agent must not infer or guess status.
+      parameters:
+        - name: request_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Access request identifier (e.g., AR-0AE46A74)
       responses:
         "200":
-          description: Status update result
+          description: Access request status response
           content:
             application/json:
               schema:
                 type: object
                 required:
-                  - request_id
-                  - status
+                  - ok
                 properties:
+                  ok:
+                    type: boolean
+                    description: Indicates whether the request was found and processed
                   request_id:
                     type: string
-                    example: AR-8F3A91C2
                   status:
                     type: string
-                    example: completed
+                    description: Lifecycle status of the access request
+                    enum:
+                      - new
+                      - assigned
+                      - in_progress
+                      - completed
+                  resource:
+                    type: string
+                  access_level:
+                    type: string
                   updated_at:
                     type: string
-                    description: ISO-8601 timestamp
-                    example: "2026-01-19T06:47:12.456Z"
+                    format: date-time
+                  error:
+                    type: string
