@@ -1,14 +1,14 @@
 openapi: 3.0.0
 
 info:
-  title: Access Request Provisioning API
+  title: Access Request Submission API
   version: "1.0.0"
   description: >
-    Tool for creating and tracking user access requests.
-    Backed by a Cloud Function (Gen2) with Firestore persistence
-    and Cloud Tasks–driven lifecycle automation.
-    Always returns HTTP 200 with a structured JSON response.
-    Designed for use with Vertex AI / Conversational Agents tools.
+    Tool for submitting user access requests.
+    Persists the request in Firestore and triggers
+    asynchronous lifecycle automation via Cloud Tasks.
+    Always returns HTTP 200 with a structured response.
+    Designed for Conversational Agents / Vertex AI tools.
 
 servers:
   - url: https://us-central1-data-engineering-479617.cloudfunctions.net
@@ -16,13 +16,12 @@ servers:
 paths:
   /submit_access_request:
     post:
-      summary: Create an access provisioning request
+      summary: Submit an access provisioning request
       operationId: submitAccessRequest
       description: >
-        Creates a new access request, stores it in Firestore,
-        and automatically progresses the request lifecycle
-        (new → assigned → in_progress → completed) within 3 minutes
-        using Cloud Tasks.
+        Creates a new access request and stores it in Firestore.
+        The lifecycle (new → assigned → in_progress → completed)
+        is managed asynchronously by Cloud Tasks.
 
       requestBody:
         required: true
@@ -54,7 +53,7 @@ paths:
 
       responses:
         "200":
-          description: Tool response (success or validation failure)
+          description: Submission result
           content:
             application/json:
               schema:
@@ -64,57 +63,9 @@ paths:
                 properties:
                   request_id:
                     type: string
-                    description: Generated access request identifier
+                    description: Generated access request ID
                     example: AR-8F3A91C2
                   status:
                     type: string
                     description: created | failed
                     example: created
-
-  /get_access_request_status:
-    get:
-      summary: Get access request status
-      operationId: getAccessRequestStatus
-      description: >
-        Fetches the current status of an access request
-        from Firestore. Designed to be agent-friendly and
-        always return HTTP 200.
-
-      parameters:
-        - name: request_id
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Access request identifier
-          example: AR-8F3A91C2
-
-      responses:
-        "200":
-          description: Current access request status
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - request_id
-                  - status
-                properties:
-                  request_id:
-                    type: string
-                    example: AR-8F3A91C2
-                  status:
-                    type: string
-                    description: new | assigned | in_progress | completed | not_found | failed
-                    example: in_progress
-                  resource:
-                    type: string
-                    example: BigQuery Dataset
-                  access_level:
-                    type: string
-                    example: read
-                  updated_at:
-                    type: string
-                    nullable: true
-                    description: ISO-8601 timestamp of last status update
-                    example: "2026-01-19T06:45:12.123Z"
