@@ -1,0 +1,51 @@
+openapi: 3.0.0
+
+info:
+  title: Access Request Status API
+  version: "1.0.0"
+  description: >
+    Agent tool to fetch the current status
+    of an access request from Firestore.
+
+servers:
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+
+paths:
+  /get_access_request_status:
+    get:
+      summary: Get access request status
+      operationId: getAccessRequestStatus
+      description: >
+        Returns the current lifecycle status
+        as stored in Firestore.
+      parameters:
+        - name: request_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Access request identifier
+      responses:
+        "200":
+          description: Current access request status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  request_id:
+                    type: string
+                    example: AR-9F32A1BC
+                  current_status:
+                    type: string
+                    example: completed
+                  resource:
+                    type: string
+                    example: BigQuery
+                  access_level:
+                    type: string
+                    example: read
+                  last_updated_at:
+                    type: string
+                    nullable: true
+                    example: "2026-01-20T12:41:09.221Z"
