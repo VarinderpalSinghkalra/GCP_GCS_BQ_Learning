@@ -1,4 +1,4 @@
-gcloud pubsub topics create access-requests-topic
+ gcloud pubsub topics create access-requests-topic
 
 gcloud tasks queues create access-request-queue \
   --location us-central1
