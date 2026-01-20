@@ -5,7 +5,7 @@ gcloud tasks queues create access-request-queue \
 
 
 
-ggcloud functions deploy submit_access_request \
+gcloud functions deploy submit_access_request \
   --gen2 \
   --runtime python312 \
   --region us-central1 \
