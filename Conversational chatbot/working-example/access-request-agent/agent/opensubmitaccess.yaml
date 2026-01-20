@@ -1,14 +1,11 @@
 openapi: 3.0.0
 
 info:
-  title: Access Request Submission API
+  title: Submit Access Request API
   version: "1.0.0"
   description: >
-    Tool for submitting user access requests.
-    Persists the request in Firestore and triggers
-    asynchronous lifecycle automation via Cloud Tasks.
-    Always returns HTTP 200 with a structured response.
-    Designed for Conversational Agents / Vertex AI tools.
+    Agent tool to submit a new access request.
+    Automatically initializes lifecycle processing.
 
 servers:
   - url: https://us-central1-data-engineering-479617.cloudfunctions.net
@@ -16,13 +13,11 @@ servers:
 paths:
   /submit_access_request:
     post:
-      summary: Submit an access provisioning request
+      summary: Submit a new access request
       operationId: submitAccessRequest
       description: >
-        Creates a new access request and stores it in Firestore.
-        The lifecycle (new → assigned → in_progress → completed)
-        is managed asynchronously by Cloud Tasks.
-
+        Creates a new access request and starts
+        the automated lifecycle flow.
       requestBody:
         required: true
         content:
@@ -36,36 +31,27 @@ paths:
               properties:
                 user_id:
                   type: string
-                  description: Unique identifier of the requesting user
-                  example: emp_100
+                  example: user123
                 resource:
                   type: string
-                  description: Resource for which access is requested
-                  example: BigQuery Dataset
+                  example: BigQuery
                 access_level:
                   type: string
-                  description: Level of access requested
                   example: read
                 justification:
                   type: string
-                  description: Optional justification for access
-                  example: Reporting access needed
-
+                  example: Required for analytics work
       responses:
         "200":
-          description: Submission result
+          description: Access request created
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  - status
                 properties:
                   request_id:
                     type: string
-                    description: Generated access request ID
-                    example: AR-8F3A91C2
+                    example: AR-9F32A1BC
                   status:
                     type: string
-                    description: created | failed
                     example: created
