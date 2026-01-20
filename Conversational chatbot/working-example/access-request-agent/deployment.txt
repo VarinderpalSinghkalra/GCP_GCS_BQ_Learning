@@ -5,7 +5,7 @@ gcloud tasks queues create access-request-queue \
 
 
 
-gcloud functions deploy submit_access_request \
+ggcloud functions deploy submit_access_request \
   --gen2 \
   --runtime python312 \
   --region us-central1 \
@@ -24,9 +24,29 @@ gcloud functions deploy update_access_request_status \
   --trigger-http \
   --allow-unauthenticated
 
-curl -i -X POST "https://us-central1-data-engineering-479617.cloudfunctions.net/submit_access_request"   -H "Content-Type: application/json"   -d '{
-    "user_id": "emp_101",
-    "resource": "BigQuery Dataset",
+
+
+gcloud functions deploy get_access_request_status \
+  --gen2 \
+  --runtime python312 \
+  --region us-central1 \
+  --source . \
+  --entry-point get_access_request_status \
+  --trigger-http \
+  --allow-unauthenticated
+
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/submit_access_request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "user123",
+    "resource": "BigQuery",
     "access_level": "read",
-    "justification": "Reporting access needed"
+    "justification": "Required for analytics work"
   }'
+
+curl \
+  "https://us-central1-data-engineering-479617.cloudfunctions.net/get_access_request_status?request_id=AR-2ECE10E9"
+
+curl \
+  "https://us-central1-data-engineering-479617.cloudfunctions.net/get_access_request_status?request_id=AR-2ECE10E9"
