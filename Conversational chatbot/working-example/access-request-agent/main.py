@@ -1,9 +1,10 @@
 """
-Access Request Provisioning Agent
+Access Request Management API
+Compatible with Google Conversational Agents (Vertex AI tools)
 
 Guarantees:
-- Always HTTP 200
-- Always valid JSON
+- Always returns HTTP 200
+- Always returns valid JSON
 - Never crashes the agent
 """
 
@@ -29,9 +30,10 @@ PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "data-engineering-479617")
 LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 
 ACCESS_REQUESTS_COL = "access_requests"
+USERS_COL = "users"
 
-ACCESS_PUBSUB_TOPIC = "access-requests-topic"
-ACCESS_TASK_QUEUE = "access-request-queue"
+PUBSUB_TOPIC = "access-requests-topic"
+TASK_QUEUE = "access-request-queue"
 
 
 # =====================================================
@@ -41,8 +43,8 @@ db = firestore.Client(project=PROJECT_ID)
 publisher = pubsub_v1.PublisherClient()
 tasks_client = tasks_v2.CloudTasksClient()
 
-topic_path = publisher.topic_path(PROJECT_ID, ACCESS_PUBSUB_TOPIC)
-queue_path = tasks_client.queue_path(PROJECT_ID, LOCATION, ACCESS_TASK_QUEUE)
+topic_path = publisher.topic_path(PROJECT_ID, PUBSUB_TOPIC)
+queue_path = tasks_client.queue_path(PROJECT_ID, LOCATION, TASK_QUEUE)
 
 
 # =====================================================
@@ -61,7 +63,46 @@ def json_response(payload: Dict[str, Any]):
 
 
 # =====================================================
-# Pub/Sub Publisher
+# Firestore helpers
+# =====================================================
+def upsert_user(user_id: str):
+    """
+    Ensures requester exists (future-proofing for RBAC / approvals)
+    """
+    db.collection(USERS_COL).document(user_id).set(
+        {
+            "last_seen_at": firestore.SERVER_TIMESTAMP,
+            "created_at": firestore.SERVER_TIMESTAMP,
+        },
+        merge=True,
+    )
+
+
+def create_access_request(
+    user_id: str,
+    resource: str,
+    access_level: str,
+    justification: str,
+) -> str:
+    request_id = f"AR-{uuid.uuid4().hex[:8].upper()}"
+
+    db.collection(ACCESS_REQUESTS_COL).document(request_id).set(
+        {
+            "user_id": user_id,
+            "resource": resource,
+            "access_level": access_level,
+            "justification": justification,
+            "status": "new",
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
+
+    return request_id
+
+
+# =====================================================
+# Pub/Sub
 # =====================================================
 def publish_event(
     request_id: str,
@@ -108,65 +149,22 @@ def schedule_task(url: str, payload: Dict[str, Any], run_at: datetime):
 
 def schedule_access_flow(request_id: str):
     """
-    3-minute lifecycle:
-    new -> assigned -> in_progress -> completed
+    Automatic lifecycle:
+    new → assigned → in_progress → completed
     """
-    base_url = (
-        f"https://{LOCATION}-{PROJECT_ID}.cloudfunctions.net/"
-        "update_access_request_status"
-    )
+    base_url = f"https://{LOCATION}-{PROJECT_ID}.cloudfunctions.net/update_access_request_status"
 
-    schedule_task(
-        base_url,
-        {"request_id": request_id, "status": "assigned"},
-        utc_now() + timedelta(minutes=1),
-    )
-
-    schedule_task(
-        base_url,
-        {"request_id": request_id, "status": "in_progress"},
-        utc_now() + timedelta(minutes=2),
-    )
-
-    schedule_task(
-        base_url,
-        {"request_id": request_id, "status": "completed"},
-        utc_now() + timedelta(minutes=3),
-    )
+    schedule_task(base_url, {"request_id": request_id, "status": "assigned"}, utc_now() + timedelta(minutes=1))
+    schedule_task(base_url, {"request_id": request_id, "status": "in_progress"}, utc_now() + timedelta(minutes=2))
+    schedule_task(base_url, {"request_id": request_id, "status": "completed"}, utc_now() + timedelta(minutes=3))
 
 
 # =====================================================
-# Firestore
-# =====================================================
-def create_access_request(
-    user_id: str,
-    resource: str,
-    access_level: str,
-    justification: str,
-):
-    request_id = f"AR-{uuid.uuid4().hex[:8].upper()}"
-
-    db.collection(ACCESS_REQUESTS_COL).document(request_id).set(
-        {
-            "user_id": user_id,
-            "resource": resource,
-            "access_level": access_level,
-            "justification": justification,
-            "status": "new",
-            "created_at": firestore.SERVER_TIMESTAMP,
-            "updated_at": firestore.SERVER_TIMESTAMP,
-        }
-    )
-
-    return request_id
-
-
-# =====================================================
-# HTTP Entrypoints (Agent Tools)
+# HTTP Entrypoints (Agent-facing)
 # =====================================================
 def submit_access_request(request):
     """
-    Tool: Create access request
+    Agent tool: Create access request
     """
     try:
         body = request.get_json(silent=True) or {}
@@ -178,6 +176,9 @@ def submit_access_request(request):
 
         if not user_id or not resource or not access_level:
             return json_response({"status": "failed"})
+
+        #  Missing piece (now added)
+        upsert_user(user_id)
 
         request_id = create_access_request(
             user_id, resource, access_level, justification
@@ -202,9 +203,48 @@ def submit_access_request(request):
         return json_response({"status": "failed"})
 
 
+def get_access_request_status(request):
+    """
+    Agent tool: Fetch current access request status (Firestore truth)
+    """
+    try:
+        request_id = (
+            request.args.get("request_id")
+            or (request.get_json(silent=True) or {}).get("request_id")
+        )
+
+        if not request_id:
+            return json_response({"status": "failed"})
+
+        snap = db.collection(ACCESS_REQUESTS_COL).document(request_id).get()
+
+        if not snap.exists:
+            return json_response({"status": "not_found"})
+
+        data = snap.to_dict()
+
+        return json_response({
+            "request_id": request_id,
+            "current_status": data.get("status"),
+            "resource": data.get("resource"),
+            "access_level": data.get("access_level"),
+            "last_updated_at": (
+                data.get("updated_at").isoformat()
+                if data.get("updated_at") else None
+            ),
+        })
+
+    except Exception:
+        traceback.print_exc()
+        return json_response({"status": "failed"})
+
+
+# =====================================================
+# INTERNAL ONLY (Cloud Tasks)
+# =====================================================
 def update_access_request_status(request):
     """
-    Cloud Tasks target
+    INTERNAL SYSTEM ENDPOINT
     """
     try:
         body = request.get_json()
@@ -233,39 +273,3 @@ def update_access_request_status(request):
     except Exception:
         traceback.print_exc()
         return json_response({"ok": False})
-
-
-def get_access_request_status(request):
-    """
-    Tool: Fetch access request status
-    """
-    try:
-        request_id = (
-            request.args.get("request_id")
-            or (request.get_json(silent=True) or {}).get("request_id")
-        )
-
-        if not request_id:
-            return json_response({"status": "failed"})
-
-        snap = db.collection(ACCESS_REQUESTS_COL).document(request_id).get()
-
-        if not snap.exists:
-            return json_response({"status": "not_found"})
-
-        data = snap.to_dict()
-
-        return json_response({
-            "request_id": request_id,
-            "status": data.get("status"),
-            "resource": data.get("resource"),
-            "access_level": data.get("access_level"),
-            "updated_at": (
-                data.get("updated_at").isoformat()
-                if data.get("updated_at") else None
-            ),
-        })
-
-    except Exception:
-        traceback.print_exc()
-        return json_response({"status": "failed"})
