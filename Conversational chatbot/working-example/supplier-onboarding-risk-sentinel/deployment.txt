@@ -50,3 +50,39 @@ curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onbo
     "country": "IR",
     "supplier_type": "COMPANY"
   }'
+
+
+
+gcloud iam service-accounts create adk-local \
+  --project=data-engineering-479617 \
+  --display-name="ADK Local Development SA"
+
+# Vertex AI (Gemini)
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:adk-local@data-engineering-479617.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+# Firestore (test data)
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:adk-local@data-engineering-479617.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+
+# Logging
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:adk-local@data-engineering-479617.iam.gserviceaccount.com" \
+  --role="roles/logging.logWriter"
+
+gcloud auth activate-service-account \
+  adk-local@data-engineering-479617.iam.gserviceaccount.com \
+  --key-file adk-local-key.json
+
+
+
+
+
+
+
+
+
+
+
