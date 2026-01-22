@@ -9,7 +9,7 @@ gcloud functions deploy onboard_supplier \
   --memory 512MB
 
 
-
+gcloud run services logs read onboard-supplier   --region us-central1   --project platform-support-analyst-57565   --limit 50
 
 
   curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
