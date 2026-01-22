@@ -1,0 +1,52 @@
+gcloud functions deploy onboard_supplier \
+  --gen2 \
+  --runtime python312 \
+  --region us-central1 \
+  --source . \
+  --entry-point onboard_supplier_http \
+  --trigger-http \
+  --allow-unauthenticated \
+  --memory 512MB
+
+
+
+
+
+  curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_name": "ABC Software ",
+    "country": "US",
+    "supplier_type": "COMPANY"
+  }'
+
+
+curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_name": "Teh Industrial Systems",
+    "country": "IR",
+    "supplier_type": "COMPANY"
+  }'
+
+
+curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_name": "Te Industrial Systems",
+    "country": "IR",
+    "supplier_type": "COMPANY"
+  }'
+
+
+
+
+
+
+curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_name": "Tehh Industrial Systems",
+    "country": "IR",
+    "supplier_type": "COMPANY"
+  }'
