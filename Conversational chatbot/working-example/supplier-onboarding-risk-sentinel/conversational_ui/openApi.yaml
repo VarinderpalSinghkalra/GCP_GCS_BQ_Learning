@@ -1,0 +1,119 @@
+openapi: 3.0.3
+
+info:
+  title: Supplier Onboarding & Risk Sentinel API
+  description: >
+    API to onboard suppliers, perform normalization, risk assessment,
+    compliance checks, and generate onboarding decisions.
+    Backed by Google Cloud Functions (Gen2).
+  version: "1.0.0"
+
+servers:
+  - url: https://us-central1-PLATFORM_PROJECT_ID.cloudfunctions.net
+    description: Cloud Functions Gen2 endpoint
+
+paths:
+  /onboard_supplier:
+    post:
+      summary: Onboard a supplier and perform risk assessment
+      operationId: onboardSupplier
+      tags:
+        - Supplier Onboarding
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupplierOnboardingRequest"
+
+      responses:
+        "200":
+          description: Supplier onboarding completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierOnboardingResponse"
+
+        "400":
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+
+    SupplierOnboardingRequest:
+      type: object
+      required:
+        - supplier_name
+        - country
+        - supplier_type
+      properties:
+        supplier_name:
+          type: string
+          example: "Acme Global Solutions Ltd"
+        country:
+          type: string
+          example: "US"
+        supplier_type:
+          type: string
+          enum:
+            - COMPANY
+            - INDIVIDUAL
+          example: "COMPANY"
+
+    SupplierOnboardingResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+          example: "2a1b4db4-c18d-431a-896e-faabd59495e4"
+
+        supplier_id:
+          type: string
+          example: "6fa4a99a-f638-4415-843f-1fd734499a12"
+
+        normalized_name:
+          type: string
+          example: "ACCENTURE SOFTWARE CO"
+
+        match_key:
+          type: string
+          example: "ACCENTURE_SOFTWARE_CO"
+
+        tax_form:
+          type: string
+          example: "W-9"
+
+        risk_level:
+          type: string
+          enum:
+            - LOW
+            - MEDIUM
+            - HIGH
+          example: "LOW"
+
+        decision:
+          type: string
+          enum:
+            - APPROVED
+            - MANUAL_REVIEW
+            - REJECTED
+          example: "APPROVED"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid or missing JSON payload"
