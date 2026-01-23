@@ -6,7 +6,12 @@ info:
     API to onboard suppliers, perform normalization, risk assessment,
     compliance checks, and generate onboarding decisions.
     Backed by Google Cloud Functions (Gen2).
-  version: "1.0.0"
+
+    Legal review behavior:
+    - LOW risk suppliers → automated legal clearance
+    - MEDIUM/HIGH risk → legal review performed
+    - Sanctioned countries → legal review NOT_APPLICABLE
+  version: "1.1.0"
 
 servers:
   - url: https://us-central1-PLATFORM_PROJECT_ID.cloudfunctions.net
@@ -110,6 +115,25 @@ components:
             - MANUAL_REVIEW
             - REJECTED
           example: "APPROVED"
+
+        legal_review:
+          $ref: "#/components/schemas/LegalReview"
+
+    LegalReview:
+      type: object
+      description: >
+        Legal review outcome based on risk level and sanctions rules.
+      properties:
+        status:
+          type: string
+          enum:
+            - COMPLETED
+            - NOT_APPLICABLE
+            - PENDING
+          example: "COMPLETED"
+        review:
+          type: string
+          example: "Standard legal review completed; no legal issues identified"
 
     ErrorResponse:
       type: object
