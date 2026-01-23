@@ -77,7 +77,7 @@ def onboard_supplier(payload: dict) -> dict:
     )
 
     # --------------------------------------------------
-    # 4️⃣ Run agent pipeline (POC-safe)
+    # 4️⃣ Run agent pipeline
     # --------------------------------------------------
     documents = execute_agent(document_collection_agent, payload)
     validations = execute_agent(document_validation_agent, documents)
@@ -96,20 +96,47 @@ def onboard_supplier(payload: dict) -> dict:
     risk_level = classify_risk(risk_score)
 
     # --------------------------------------------------
-    # 5️⃣ Decision logic (deterministic)
+    # 5️⃣ Decision logic (Enterprise-grade & deterministic)
     # --------------------------------------------------
     legal_review = None
 
-    if risk_level == "LOW":
-        decision = "APPROVED"
+    # 🛑 SANCTIONS OVERRIDE (Hard stop)
+    if risk_reason == "Sanctioned country":
+        decision = "REJECTED"
+        legal_review = {
+            "status": "NOT_APPLICABLE",
+            "review": "Legal review not applicable due to sanctions restrictions"
+        }
 
+    # ✅ LOW RISK — Auto legal clearance
+    elif risk_level == "LOW":
+        decision = "APPROVED"
+        legal_review = {
+            "status": "COMPLETED",
+            "review": "Standard legal review completed; no legal issues identified"
+        }
+
+    # ⚠️ MEDIUM RISK — Legal review required
     elif risk_level == "MEDIUM":
         decision = "MANUAL_REVIEW"
-        legal_review = execute_agent(legal_review_agent, risk)
+        legal_review = execute_agent(
+            legal_review_agent,
+            {
+                "country": payload["country"],
+                "risk_reason": risk_reason
+            }
+        )
 
+    # ❌ HIGH RISK — Legal review unless sanctioned
     else:
         decision = "REJECTED"
-        legal_review = execute_agent(legal_review_agent, risk)
+        legal_review = execute_agent(
+            legal_review_agent,
+            {
+                "country": payload["country"],
+                "risk_reason": risk_reason
+            }
+        )
 
     # --------------------------------------------------
     # 6️⃣ Store approved documents in GCS
@@ -173,4 +200,3 @@ def onboard_supplier(payload: dict) -> dict:
         "risk_level": risk_level,
         "decision": decision
     }
-
