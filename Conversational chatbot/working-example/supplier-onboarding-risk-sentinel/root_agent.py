@@ -1,5 +1,5 @@
-
 import uuid
+from google.cloud import storage
 
 from tools.normalization_tool import normalize_supplier_name
 from tools.firestore_tool import (
@@ -22,6 +22,23 @@ from agents.compliance_agent import compliance_agent
 from agents.risk_scoring_agent import risk_scoring_agent
 from agents.legal_review_agent import legal_review_agent
 from agents.notification_agent import notification_agent
+
+from tools.w9_cover_page_tool import generate_w9_with_cover
+
+
+# ✅ Your confirmed W-9 template (NON-FILLABLE)
+W9_TEMPLATE_URI = "gs://contracts-demo-277069041958/fw9.pdf"
+
+
+def load_gcs_file(gcs_uri: str) -> bytes:
+    client = storage.Client()
+    _, _, bucket_name, *path = gcs_uri.split("/")
+    blob = client.bucket(bucket_name).blob("/".join(path))
+
+    if not blob.exists():
+        raise FileNotFoundError(f"W-9 template not found at {gcs_uri}")
+
+    return blob.download_as_bytes()
 
 
 def onboard_supplier(payload: dict) -> dict:
@@ -97,11 +114,8 @@ def onboard_supplier(payload: dict) -> dict:
     risk_level = classify_risk(risk_score)
 
     # --------------------------------------------------
-    # 5️⃣ Decision logic (Enterprise-grade & deterministic)
+    # 5️⃣ Decision logic
     # --------------------------------------------------
-    legal_review = None
-
-    # 🛑 SANCTIONS OVERRIDE (Hard stop)
     if risk_reason == "Sanctioned country":
         decision = "REJECTED"
         legal_review = {
@@ -109,7 +123,6 @@ def onboard_supplier(payload: dict) -> dict:
             "review": "Legal review not applicable due to sanctions restrictions"
         }
 
-    # ✅ LOW RISK — Auto legal clearance
     elif risk_level == "LOW":
         decision = "APPROVED"
         legal_review = {
@@ -117,38 +130,53 @@ def onboard_supplier(payload: dict) -> dict:
             "review": "Standard legal review completed; no legal issues identified"
         }
 
-    # ⚠️ MEDIUM RISK — Legal review required
     elif risk_level == "MEDIUM":
         decision = "MANUAL_REVIEW"
         legal_review = execute_agent(
             legal_review_agent,
-            {
-                "country": payload["country"],
-                "risk_reason": risk_reason
-            }
+            {"country": payload["country"], "risk_reason": risk_reason}
         )
 
-    # ❌ HIGH RISK — Legal review unless sanctioned
     else:
         decision = "REJECTED"
         legal_review = execute_agent(
             legal_review_agent,
-            {
-                "country": payload["country"],
-                "risk_reason": risk_reason
-            }
+            {"country": payload["country"], "risk_reason": risk_reason}
         )
 
     # --------------------------------------------------
     # 6️⃣ Store approved documents in GCS
+    #     ✅ W-9 WITH SUPPLIER NAME (COVER PAGE)
     # --------------------------------------------------
     if decision in ["APPROVED", "MANUAL_REVIEW"]:
-        gcs_uri = upload_approved_document(
-            supplier_id=supplier_id,
-            document_type=tax_form,
-            file_bytes=b"%PDF-POC-DATA%",
-            filename=f"{tax_form}.pdf"
-        )
+
+        if tax_form == "W-9" and payload["country"] == "US":
+            template_bytes = load_gcs_file(W9_TEMPLATE_URI)
+
+            # ✅ SAFE: add supplier name via cover page
+            final_pdf_bytes = generate_w9_with_cover(
+                original_w9_bytes=template_bytes,
+                supplier_name=normalized["normalized_name"]
+            )
+
+            gcs_uri = upload_approved_document(
+                supplier_id=supplier_id,
+                document_type="W-9",
+                filename="W-9-DRAFT.pdf",
+                file_bytes=final_pdf_bytes,
+                content_type="application/pdf",
+                content_disposition="attachment; filename=W-9-DRAFT.pdf"
+            )
+
+        else:
+            gcs_uri = upload_approved_document(
+                supplier_id=supplier_id,
+                document_type=tax_form,
+                filename=f"{tax_form}.pdf",
+                file_bytes=documents[tax_form]["file_bytes"],
+                content_type="application/pdf",
+                content_disposition=f"attachment; filename={tax_form}.pdf"
+            )
 
         if gcs_uri:
             add_approved_document(
@@ -171,7 +199,7 @@ def onboard_supplier(payload: dict) -> dict:
 
     send_email(
         email.get("recipients", []),
-        email.get("subject", "Supplier Onboarding Update"),
+        email.get("subject", "Supplier Onboarding Decision"),
         email.get("body", "Supplier onboarding completed.")
     )
 
@@ -185,7 +213,8 @@ def onboard_supplier(payload: dict) -> dict:
             "risk_level": risk_level,
             "risk_score": risk_score,
             "risk_reason": risk_reason,
-            "legal_review": legal_review
+            "legal_review": legal_review,
+            "w9_status": "DRAFT_WITH_SUPPLIER_NAME" if tax_form == "W-9" else None
         }
     )
 
@@ -201,3 +230,4 @@ def onboard_supplier(payload: dict) -> dict:
         "risk_level": risk_level,
         "decision": decision
     }
+
