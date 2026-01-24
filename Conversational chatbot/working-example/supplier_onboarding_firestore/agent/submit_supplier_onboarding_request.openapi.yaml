@@ -1,0 +1,82 @@
+openapi: 3.0.3
+info:
+  title: Submit Supplier Onboarding API
+  description: >
+    API to submit a supplier onboarding request.
+    Compatible with Google Cloud Functions and Vertex AI tools.
+
+    Guarantees:
+    - Always returns HTTP 200
+    - Always returns valid JSON
+    - Never crashes the agent
+  version: "1.0.0"
+
+servers:
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+    description: Cloud Functions endpoint
+
+paths:
+  /submit_supplier_onboarding_request:
+    post:
+      summary: Submit supplier onboarding request
+      operationId: submitSupplierOnboardingRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitSupplierOnboardingRequest"
+            examples:
+              success:
+                value:
+                  supplier_id: SUP-001
+                  supplier_name: ABC Logistics Pvt Ltd
+                  country: India
+                  justification: New logistics partner
+      responses:
+        "200":
+          description: Always returns 200 with JSON payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitSupplierOnboardingResponse"
+              examples:
+                created:
+                  value:
+                    request_id: SUP-A1B2C3D4
+                    status: created
+                failed:
+                  value:
+                    status: failed
+
+components:
+  schemas:
+    SubmitSupplierOnboardingRequest:
+      type: object
+      required:
+        - supplier_id
+        - supplier_name
+        - country
+      properties:
+        supplier_id:
+          type: string
+          example: SUP-001
+        supplier_name:
+          type: string
+          example: ABC Logistics Pvt Ltd
+        country:
+          type: string
+          example: India
+        justification:
+          type: string
+          example: New logistics partner
+
+    SubmitSupplierOnboardingResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+          example: SUP-A1B2C3D4
+        status:
+          type: string
+          example: created
