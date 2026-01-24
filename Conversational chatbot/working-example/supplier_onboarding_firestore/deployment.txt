@@ -5,3 +5,45 @@ gcloud pubsub topics create supplier-onboarding-events
 
   gcloud tasks queues create supplier-onboarding-queue \
   --location=us-central1
+
+
+gcloud functions deploy submit_supplier_onboarding_request \
+  --gen2 \
+  --runtime=python311 \
+  --region=us-central1 \
+  --entry-point=submit_supplier_onboarding_request \
+  --trigger-http \
+  --allow-unauthenticated
+
+
+gcloud functions deploy get_supplier_onboarding_status \
+  --gen2 \
+  --runtime=python311 \
+  --region=us-central1 \
+  --entry-point=get_supplier_onboarding_status \
+  --trigger-http \
+  --allow-unauthenticated
+
+gcloud functions deploy update_supplier_onboarding_status \
+  --gen2 \
+  --runtime=python311 \
+  --region=us-central1 \
+  --entry-point=update_supplier_onboarding_status \
+  --trigger-http \
+  --allow-unauthenticated
+
+
+
+curl -X POST \
+  https://us-central1-data-engineering-479617.cloudfunctions.net/submit_supplier_onboarding_request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_id": "SUP-001",
+    "supplier_name": "ABC Logistics Pvt Ltd",
+    "country": "India",
+    "justification": "Need new carrier partner"
+  }'
+
+
+curl -X GET   "https://us-central1-data-engineering-479617.cloudfunctions.net/get_supplier_onboarding_status?request_id=SUP-B6B94C22"                                                             
+
