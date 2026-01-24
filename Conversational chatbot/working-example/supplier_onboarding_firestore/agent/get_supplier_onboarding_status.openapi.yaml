@@ -1,0 +1,93 @@
+openapi: 3.0.3
+info:
+  title: Get Supplier Onboarding Status API
+  description: >
+    API to fetch the status of a supplier onboarding request.
+    Compatible with Google Cloud Functions and Vertex AI tools.
+
+    Guarantees:
+    - Always returns HTTP 200
+    - Always returns valid JSON
+    - Never crashes the agent
+  version: "1.0.0"
+
+servers:
+  - url: https://us-central1-data-engineering-479617.cloudfunctions.net
+    description: Cloud Functions endpoint
+
+paths:
+  /get_supplier_onboarding_status:
+    get:
+      summary: Get supplier onboarding status
+      operationId: getSupplierOnboardingStatus
+      parameters:
+        - name: request_id
+          in: query
+          required: true
+          schema:
+            type: string
+          example: SUP-A1B2C3D4
+      responses:
+        "200":
+          description: Always returns 200 with JSON payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetSupplierOnboardingStatusResponse"
+              examples:
+                success:
+                  value:
+                    request_id: SUP-A1B2C3D4
+                    supplier_name: ABC Logistics Pvt Ltd
+                    status: approved
+                    country: India
+                not_found:
+                  value:
+                    status: not_found
+                failed:
+                  value:
+                    status: failed
+
+    post:
+      summary: Get supplier onboarding status (POST)
+      operationId: getSupplierOnboardingStatusPost
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetSupplierOnboardingStatusRequest"
+      responses:
+        "200":
+          description: Always returns 200 with JSON payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetSupplierOnboardingStatusResponse"
+
+components:
+  schemas:
+    GetSupplierOnboardingStatusRequest:
+      type: object
+      required:
+        - request_id
+      properties:
+        request_id:
+          type: string
+          example: SUP-A1B2C3D4
+
+    GetSupplierOnboardingStatusResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+          example: SUP-A1B2C3D4
+        supplier_name:
+          type: string
+          example: ABC Logistics Pvt Ltd
+        status:
+          type: string
+          example: approved
+        country:
+          type: string
+          example: India
