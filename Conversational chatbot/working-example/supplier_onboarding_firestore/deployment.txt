@@ -45,5 +45,5 @@ curl -X POST \
   }'
 
 
-curl -X GET   "https://us-central1-data-engineering-479617.cloudfunctions.net/get_supplier_onboarding_status?request_id=SUP-B6B94C22"                                                             
+curl -X GET   "https://us-central1-data-engineering-479617.cloudfunctions.net/get_supplier_onboarding_status?request_id=SUP-9E62B1D6"                                                             
 
