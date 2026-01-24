@@ -1,28 +1,25 @@
 from google.cloud import storage
 
-BUCKET_NAME = "contracts-demo-277069041958"
-
-client = storage.Client()
 
 def upload_approved_document(
     supplier_id: str,
     document_type: str,
+    filename: str,
     file_bytes: bytes,
-    filename: str
-) -> str | None:
-    """
-    Uploads approved document to GCS.
-    NEVER raises exception (safe for CF).
-    """
+    content_type: str = "application/pdf",
+    content_disposition: str = None
+) -> str:
+    client = storage.Client()
+    bucket = client.bucket("contracts-demo-277069041958")
 
-    try:
-        bucket = client.bucket(BUCKET_NAME)
-        blob = bucket.blob(f"{supplier_id}/{document_type}/{filename}")
-        blob.upload_from_string(file_bytes, content_type="application/pdf")
-        return f"gs://{BUCKET_NAME}/{blob.name}"
+    destination_path = f"{supplier_id}/{document_type}/{filename}"
+    blob = bucket.blob(destination_path)
 
-    except Exception as e:
-        # Log and continue onboarding
-        print(f"[WARN] GCS upload failed: {e}")
-        return None
+    blob.upload_from_string(file_bytes, content_type=content_type)
+
+    if content_disposition:
+        blob.content_disposition = content_disposition
+        blob.patch()
+
+    return f"gs://{bucket.name}/{destination_path}"
 
