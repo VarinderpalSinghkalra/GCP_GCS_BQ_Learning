@@ -26,7 +26,7 @@ from google.protobuf import timestamp_pb2
 # =====================================================
 # Configuration
 # =====================================================
-PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "data-engineering-479617")
 LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 
 SUPPLIER_REQUESTS_COL = "supplier_onboarding_requests"
