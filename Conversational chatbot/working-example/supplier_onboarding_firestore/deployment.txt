@@ -1,0 +1,7 @@
+gcloud pubsub topics create supplier-onboarding-events
+
+  gcloud pubsub subscriptions create supplier-onboarding-sub \
+  --topic=supplier-onboarding-events
+
+  gcloud tasks queues create supplier-onboarding-queue \
+  --location=us-central1
