@@ -1,3 +1,4 @@
+
 import uuid
 
 from tools.normalization_tool import normalize_supplier_name
