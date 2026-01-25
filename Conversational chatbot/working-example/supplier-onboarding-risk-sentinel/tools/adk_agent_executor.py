@@ -1,7 +1,11 @@
+from config.email_config import EMAIL_CONFIG
+
+SANCTIONED_COUNTRIES = {"IR", "KP", "SY", "CU", "RU"}
+
+
 def execute_agent(agent, payload: dict) -> dict:
     """
-    POC-safe agent executor.
-    Deterministic logic for stability + demos.
+    Deterministic agent executor (POC-safe).
     """
 
     agent_name = getattr(agent, "name", "").lower()
@@ -10,7 +14,10 @@ def execute_agent(agent, payload: dict) -> dict:
     # Document collection
     # -----------------------------
     if "document" in agent_name:
-        return {"documents": ["W-9", "W-8"]}
+        return {
+            "W-9": {"file_bytes": b"dummy"},
+            "W-8BEN-E": {"file_bytes": b"dummy"}
+        }
 
     # -----------------------------
     # Document validation
@@ -25,58 +32,92 @@ def execute_agent(agent, payload: dict) -> dict:
         return {"compliant": True}
 
     # -----------------------------
-    # Risk scoring (UPDATED LOGIC)
+    # Risk scoring
     # -----------------------------
     if "risk" in agent_name:
         country = payload.get("country", "").upper()
         supplier = payload.get("supplier_name", "").lower()
 
-        # HIGH risk – sanctioned countries
-        if country in ["IR", "KP", "RU"]:
-            return {
-                "risk_score": 90,
-                "risk_reason": "Sanctioned country"
-            }
+        if country in SANCTIONED_COUNTRIES:
+            return {"risk_score": 90, "risk_reason": "Sanctioned country"}
 
-        # MEDIUM risk – large global firms
-        high_profile = [
-            "accenture", "deloitte", "pwc",
-            "ey", "kpmg", "ibm", "oracle"
-        ]
-        if any(name in supplier for name in high_profile):
-            return {
-                "risk_score": 50,
-                "risk_reason": "High-profile global supplier"
-            }
+        if any(
+            k in supplier
+            for k in ["accenture", "deloitte", "pwc", "ey", "kpmg", "ibm", "oracle"]
+        ):
+            return {"risk_score": 50, "risk_reason": "High-profile global supplier"}
 
-        # MEDIUM risk – non-US supplier
         if country and country != "US":
-            return {
-                "risk_score": 40,
-                "risk_reason": "Non-US supplier"
-            }
+            return {"risk_score": 40, "risk_reason": "Non-US supplier"}
 
-        # LOW risk – default
-        return {
-            "risk_score": 20,
-            "risk_reason": "Domestic low-risk supplier"
-        }
+        return {"risk_score": 20, "risk_reason": "Low-risk supplier"}
 
     # -----------------------------
     # Legal review
     # -----------------------------
     if "legal" in agent_name:
-        return {"review": "No legal issues identified"}
+        country = payload.get("country", "").upper()
+
+        if country in SANCTIONED_COUNTRIES:
+            return {
+                "status": "NOT_APPLICABLE",
+                "review": "No legal review conducted because supplier is from a sanctioned country"
+            }
+
+        return {
+            "status": "COMPLETED",
+            "review": "No legal issues identified"
+        }
 
     # -----------------------------
-    # Notification
+    # Notification (🔥 FINAL & CORRECT 🔥)
     # -----------------------------
     if "notification" in agent_name:
+        decision = payload.get("decision")
+        supplier = payload.get("supplier")
+        country = payload.get("country")
+        is_sanctioned = payload.get("is_sanctioned", False)
+
+        recipients = []
+        subject = ""
+        body = ""
+
+        if decision == "APPROVED":
+            recipients = EMAIL_CONFIG["ROLE_RECIPIENTS"]["PROCUREMENT"]
+            subject = "Supplier Approved"
+            body = f"Supplier {supplier} has been approved."
+
+        elif decision == "MANUAL_REVIEW":
+            recipients = (
+                EMAIL_CONFIG["ROLE_RECIPIENTS"]["LEGAL"]
+                + EMAIL_CONFIG["ROLE_RECIPIENTS"]["AUDIT"]
+            )
+            subject = "Manual Review Required – Supplier Onboarding"
+            body = (
+                f"Supplier {supplier} requires manual review.\n"
+                f"Country: {country}"
+            )
+
+        elif decision == "REJECTED" and is_sanctioned:
+            recipients = (
+                EMAIL_CONFIG["ROLE_RECIPIENTS"]["LEGAL"]
+                + EMAIL_CONFIG["ROLE_RECIPIENTS"]["AUDIT"]
+            )
+            subject = "Supplier Auto-Rejected – Sanctions Policy"
+            body = (
+                f"Supplier {supplier} was automatically rejected "
+                f"due to sanctions on country {country}."
+            )
+
+        elif decision == "REJECTED":
+            recipients = EMAIL_CONFIG["ROLE_RECIPIENTS"]["PROCUREMENT"]
+            subject = "Supplier Rejected"
+            body = f"Supplier {supplier} has been rejected."
+
         return {
-            "recipients": ["procurement@example.com"],
-            "subject": "Supplier Onboarding Decision",
-            "body": "Supplier onboarding completed."
+            "recipients": list(set(recipients)),
+            "subject": subject,
+            "body": body
         }
 
     return {}
-
