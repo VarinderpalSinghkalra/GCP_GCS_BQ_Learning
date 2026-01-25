@@ -8,6 +8,12 @@ gcloud functions deploy onboard_supplier \
   --allow-unauthenticated \
   --memory 512MB
 
+gcloud functions deploy onboard_supplier \
+  --region us-central1 \
+  --runtime python312 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --set-env-vars SENDGRID_API_KEY=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
 
 gcloud run services logs read onboard-supplier   --region us-central1   --project platform-support-analyst-57565   --limit 50
 
