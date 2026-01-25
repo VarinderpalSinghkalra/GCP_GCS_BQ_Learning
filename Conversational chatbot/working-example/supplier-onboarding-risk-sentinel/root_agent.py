@@ -26,21 +26,40 @@ from agents.notification_agent import notification_agent
 from tools.w9_cover_page_tool import generate_w9_with_cover
 
 
-# ✅ Your confirmed W-9 template (NON-FILLABLE)
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
 W9_TEMPLATE_URI = "gs://contracts-demo-277069041958/fw9.pdf"
+SANCTIONED_COUNTRIES = {"IR", "KP", "SY", "CU", "RU"}
 
 
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
 def load_gcs_file(gcs_uri: str) -> bytes:
     client = storage.Client()
     _, _, bucket_name, *path = gcs_uri.split("/")
     blob = client.bucket(bucket_name).blob("/".join(path))
 
     if not blob.exists():
-        raise FileNotFoundError(f"W-9 template not found at {gcs_uri}")
+        raise FileNotFoundError(f"File not found at {gcs_uri}")
 
     return blob.download_as_bytes()
 
 
+def should_send_notification(decision: str) -> bool:
+    """
+    Email rules (FINAL):
+    - APPROVED → YES
+    - MANUAL_REVIEW → YES
+    - REJECTED (all cases) → YES
+    """
+    return decision in {"APPROVED", "MANUAL_REVIEW", "REJECTED"}
+
+
+# --------------------------------------------------
+# MAIN ENTRY
+# --------------------------------------------------
 def onboard_supplier(payload: dict) -> dict:
     request_id = str(uuid.uuid4())
 
@@ -61,17 +80,18 @@ def onboard_supplier(payload: dict) -> dict:
         }
 
     supplier_id = str(uuid.uuid4())
+    country = payload["country"]
 
     # --------------------------------------------------
     # 2️⃣ Determine tax form
     # --------------------------------------------------
     tax_form = get_required_tax_form(
-        payload["country"],
+        country,
         payload.get("supplier_type", "COMPANY")
     )
 
     # --------------------------------------------------
-    # 3️⃣ Create base Firestore records
+    # 3️⃣ Create Firestore base records
     # --------------------------------------------------
     create_supplier_master(
         supplier_id,
@@ -88,24 +108,24 @@ def onboard_supplier(payload: dict) -> dict:
         {
             "supplier_id": supplier_id,
             "name": normalized["normalized_name"],
-            "country": payload["country"],
+            "country": country,
             "tax_form": tax_form,
             "status": "ONBOARDING"
         }
     )
 
     # --------------------------------------------------
-    # 4️⃣ Run agent pipeline
+    # 4️⃣ Agent pipeline
     # --------------------------------------------------
     documents = execute_agent(document_collection_agent, payload)
     validations = execute_agent(document_validation_agent, documents)
-    compliance = execute_agent(compliance_agent, validations)
+    _ = execute_agent(compliance_agent, validations)
 
     risk = execute_agent(
         risk_scoring_agent,
         {
             "supplier_name": normalized["normalized_name"],
-            "country": payload["country"]
+            "country": country
         }
     )
 
@@ -114,47 +134,56 @@ def onboard_supplier(payload: dict) -> dict:
     risk_level = classify_risk(risk_score)
 
     # --------------------------------------------------
-    # 5️⃣ Decision logic
+    # 5️⃣ DECISION + LEGAL
     # --------------------------------------------------
-    if risk_reason == "Sanctioned country":
+    if country in SANCTIONED_COUNTRIES:
         decision = "REJECTED"
+        risk_level = "HIGH"
+        risk_score = 90
+        risk_reason = "Sanctioned country"
+
         legal_review = {
             "status": "NOT_APPLICABLE",
-            "review": "Legal review not applicable due to sanctions restrictions"
+            "review": "No legal review conducted because the supplier is from a sanctioned country",
+            "risk_reason": "Sanctioned country"
         }
 
     elif risk_level == "LOW":
         decision = "APPROVED"
         legal_review = {
             "status": "COMPLETED",
-            "review": "Standard legal review completed; no legal issues identified"
+            "review": "No legal issues identified"
         }
 
     elif risk_level == "MEDIUM":
         decision = "MANUAL_REVIEW"
         legal_review = execute_agent(
             legal_review_agent,
-            {"country": payload["country"], "risk_reason": risk_reason}
+            {
+                "country": country,
+                "risk_reason": risk_reason
+            }
         )
 
     else:
         decision = "REJECTED"
         legal_review = execute_agent(
             legal_review_agent,
-            {"country": payload["country"], "risk_reason": risk_reason}
+            {
+                "country": country,
+                "risk_reason": risk_reason
+            }
         )
 
     # --------------------------------------------------
-    # 6️⃣ Store approved documents in GCS
-    #     ✅ W-9 WITH SUPPLIER NAME (COVER PAGE)
+    # 6️⃣ Upload approved / draft documents
     # --------------------------------------------------
-    if decision in ["APPROVED", "MANUAL_REVIEW"]:
+    if decision in {"APPROVED", "MANUAL_REVIEW"}:
 
-        if tax_form == "W-9" and payload["country"] == "US":
+        if tax_form == "W-9" and country == "US":
             template_bytes = load_gcs_file(W9_TEMPLATE_URI)
 
-            # ✅ SAFE: add supplier name via cover page
-            final_pdf_bytes = generate_w9_with_cover(
+            final_pdf = generate_w9_with_cover(
                 original_w9_bytes=template_bytes,
                 supplier_name=normalized["normalized_name"]
             )
@@ -163,7 +192,7 @@ def onboard_supplier(payload: dict) -> dict:
                 supplier_id=supplier_id,
                 document_type="W-9",
                 filename="W-9-DRAFT.pdf",
-                file_bytes=final_pdf_bytes,
+                file_bytes=final_pdf,
                 content_type="application/pdf",
                 content_disposition="attachment; filename=W-9-DRAFT.pdf"
             )
@@ -186,22 +215,32 @@ def onboard_supplier(payload: dict) -> dict:
             )
 
     # --------------------------------------------------
-    # 7️⃣ Email notification
+    # 7️⃣ EMAIL NOTIFICATION (FINAL)
     # --------------------------------------------------
-    email = execute_agent(
-        notification_agent,
-        {
+    if should_send_notification(decision):
+
+        email_payload = {
             "supplier": normalized["normalized_name"],
             "decision": decision,
-            "risk_level": risk_level
+            "risk_level": risk_level,
+            "country": country,
+            "is_sanctioned": country in SANCTIONED_COUNTRIES
         }
-    )
 
-    send_email(
-        email.get("recipients", []),
-        email.get("subject", "Supplier Onboarding Decision"),
-        email.get("body", "Supplier onboarding completed.")
-    )
+        email = execute_agent(notification_agent, email_payload)
+
+        print("📨 EMAIL PAYLOAD:", email)
+
+        recipients = list(set(email.get("recipients", [])))
+
+        if recipients:
+            send_email(
+                recipients,
+                email.get("subject", "Supplier Onboarding Update"),
+                email.get("body", "")
+            )
+        else:
+            print("ℹ️ No recipients resolved. Email skipped.")
 
     # --------------------------------------------------
     # 8️⃣ Final Firestore update
@@ -214,12 +253,16 @@ def onboard_supplier(payload: dict) -> dict:
             "risk_score": risk_score,
             "risk_reason": risk_reason,
             "legal_review": legal_review,
-            "w9_status": "DRAFT_WITH_SUPPLIER_NAME" if tax_form == "W-9" else None
+            "w9_status": (
+                "DRAFT_WITH_SUPPLIER_NAME"
+                if tax_form == "W-9" and decision != "REJECTED"
+                else None
+            )
         }
     )
 
     # --------------------------------------------------
-    # 9️⃣ API Response
+    # 9️⃣ API RESPONSE
     # --------------------------------------------------
     return {
         "request_id": request_id,
@@ -230,4 +273,3 @@ def onboard_supplier(payload: dict) -> dict:
         "risk_level": risk_level,
         "decision": decision
     }
-
