@@ -1,7 +1,10 @@
 import uuid
 from google.cloud import storage
 
-from tools.normalization_tool import normalize_supplier_name
+from tools.normalization_tool import (
+    normalize_supplier_name,
+    normalize_country
+)
 from tools.firestore_tool import (
     create_supplier,
     update_supplier,
@@ -33,9 +36,6 @@ W9_TEMPLATE_URI = "gs://contracts-demo-277069041958/fw9.pdf"
 SANCTIONED_COUNTRIES = {"IR", "KP", "SY", "CU", "RU"}
 
 
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
 def load_gcs_file(gcs_uri: str) -> bytes:
     client = storage.Client()
     _, _, bucket_name, *path = gcs_uri.split("/")
@@ -48,12 +48,6 @@ def load_gcs_file(gcs_uri: str) -> bytes:
 
 
 def should_send_notification(decision: str) -> bool:
-    """
-    Email rules (FINAL):
-    - APPROVED → YES
-    - MANUAL_REVIEW → YES
-    - REJECTED (all cases) → YES
-    """
     return decision in {"APPROVED", "MANUAL_REVIEW", "REJECTED"}
 
 
@@ -63,9 +57,7 @@ def should_send_notification(decision: str) -> bool:
 def onboard_supplier(payload: dict) -> dict:
     request_id = str(uuid.uuid4())
 
-    # --------------------------------------------------
-    # 1️⃣ Normalize supplier name
-    # --------------------------------------------------
+    # 1️⃣ Normalize supplier
     normalized = normalize_supplier_name(payload["supplier_name"])
     match_key = normalized["match_key"]
 
@@ -80,19 +72,18 @@ def onboard_supplier(payload: dict) -> dict:
         }
 
     supplier_id = str(uuid.uuid4())
-    country = payload["country"]
 
-    # --------------------------------------------------
-    # 2️⃣ Determine tax form
-    # --------------------------------------------------
+    # ✅ NORMALIZE COUNTRY (CRITICAL FIX)
+    raw_country = payload["country"]
+    country = normalize_country(raw_country)
+
+    # 2️⃣ Tax form
     tax_form = get_required_tax_form(
         country,
         payload.get("supplier_type", "COMPANY")
     )
 
-    # --------------------------------------------------
-    # 3️⃣ Create Firestore base records
-    # --------------------------------------------------
+    # 3️⃣ Firestore base
     create_supplier_master(
         supplier_id,
         {
@@ -114,9 +105,7 @@ def onboard_supplier(payload: dict) -> dict:
         }
     )
 
-    # --------------------------------------------------
     # 4️⃣ Agent pipeline
-    # --------------------------------------------------
     documents = execute_agent(document_collection_agent, payload)
     validations = execute_agent(document_validation_agent, documents)
     _ = execute_agent(compliance_agent, validations)
@@ -133,9 +122,7 @@ def onboard_supplier(payload: dict) -> dict:
     risk_reason = risk.get("risk_reason", "Default risk logic")
     risk_level = classify_risk(risk_score)
 
-    # --------------------------------------------------
-    # 5️⃣ DECISION + LEGAL
-    # --------------------------------------------------
+    # 5️⃣ Decision + Legal
     if country in SANCTIONED_COUNTRIES:
         decision = "REJECTED"
         risk_level = "HIGH"
@@ -144,8 +131,8 @@ def onboard_supplier(payload: dict) -> dict:
 
         legal_review = {
             "status": "NOT_APPLICABLE",
-            "review": "No legal review conducted because the supplier is from a sanctioned country",
-            "risk_reason": "Sanctioned country"
+            "review": "Supplier belongs to a sanctioned country",
+            "risk_reason": risk_reason
         }
 
     elif risk_level == "LOW":
@@ -159,92 +146,64 @@ def onboard_supplier(payload: dict) -> dict:
         decision = "MANUAL_REVIEW"
         legal_review = execute_agent(
             legal_review_agent,
-            {
-                "country": country,
-                "risk_reason": risk_reason
-            }
+            {"country": country, "risk_reason": risk_reason}
         )
 
     else:
         decision = "REJECTED"
         legal_review = execute_agent(
             legal_review_agent,
-            {
-                "country": country,
-                "risk_reason": risk_reason
-            }
+            {"country": country, "risk_reason": risk_reason}
         )
 
-    # --------------------------------------------------
-    # 6️⃣ Upload approved / draft documents
-    # --------------------------------------------------
+    # 6️⃣ Documents
     if decision in {"APPROVED", "MANUAL_REVIEW"}:
-
         if tax_form == "W-9" and country == "US":
             template_bytes = load_gcs_file(W9_TEMPLATE_URI)
-
             final_pdf = generate_w9_with_cover(
-                original_w9_bytes=template_bytes,
-                supplier_name=normalized["normalized_name"]
+                template_bytes,
+                normalized["normalized_name"]
             )
 
             gcs_uri = upload_approved_document(
-                supplier_id=supplier_id,
-                document_type="W-9",
-                filename="W-9-DRAFT.pdf",
-                file_bytes=final_pdf,
-                content_type="application/pdf",
-                content_disposition="attachment; filename=W-9-DRAFT.pdf"
+                supplier_id,
+                "W-9",
+                "W-9-DRAFT.pdf",
+                final_pdf,
+                "application/pdf",
+                "attachment; filename=W-9-DRAFT.pdf"
             )
-
         else:
             gcs_uri = upload_approved_document(
-                supplier_id=supplier_id,
-                document_type=tax_form,
-                filename=f"{tax_form}.pdf",
-                file_bytes=documents[tax_form]["file_bytes"],
-                content_type="application/pdf",
-                content_disposition=f"attachment; filename={tax_form}.pdf"
+                supplier_id,
+                tax_form,
+                f"{tax_form}.pdf",
+                documents[tax_form]["file_bytes"],
+                "application/pdf",
+                f"attachment; filename={tax_form}.pdf"
             )
 
         if gcs_uri:
-            add_approved_document(
-                supplier_id=supplier_id,
-                document_type=tax_form,
-                gcs_uri=gcs_uri
-            )
+            add_approved_document(supplier_id, tax_form, gcs_uri)
 
-    # --------------------------------------------------
-    # 7️⃣ EMAIL NOTIFICATION (FINAL)
-    # --------------------------------------------------
+    # 7️⃣ Email
     if should_send_notification(decision):
-
-        email_payload = {
-            "supplier": normalized["normalized_name"],
-            "decision": decision,
-            "risk_level": risk_level,
-            "country": country,
-            "is_sanctioned": country in SANCTIONED_COUNTRIES
-        }
-
-        email = execute_agent(notification_agent, email_payload)
-
-        print("📨 EMAIL PAYLOAD:", email)
+        email = execute_agent(
+            notification_agent,
+            {
+                "supplier": normalized["normalized_name"],
+                "decision": decision,
+                "risk_level": risk_level,
+                "country": country,
+                "is_sanctioned": country in SANCTIONED_COUNTRIES
+            }
+        )
 
         recipients = list(set(email.get("recipients", [])))
-
         if recipients:
-            send_email(
-                recipients,
-                email.get("subject", "Supplier Onboarding Update"),
-                email.get("body", "")
-            )
-        else:
-            print("ℹ️ No recipients resolved. Email skipped.")
+            send_email(recipients, email["subject"], email["body"])
 
-    # --------------------------------------------------
-    # 8️⃣ Final Firestore update
-    # --------------------------------------------------
+    # 8️⃣ Final Firestore
     update_supplier(
         supplier_id,
         {
@@ -261,9 +220,6 @@ def onboard_supplier(payload: dict) -> dict:
         }
     )
 
-    # --------------------------------------------------
-    # 9️⃣ API RESPONSE
-    # --------------------------------------------------
     return {
         "request_id": request_id,
         "supplier_id": supplier_id,
