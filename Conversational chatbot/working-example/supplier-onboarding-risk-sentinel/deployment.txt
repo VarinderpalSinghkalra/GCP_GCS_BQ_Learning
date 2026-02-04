@@ -71,6 +71,19 @@ curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onbo
 
 
 
+curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_name": "XYZK Consulting Pvt Ltd",
+    "country": "UNITED STATES",
+    "supplier_type": "COMPANY",
+    "rfq_id": "RFQ-2025-001",
+    "raw_email": "From: supplier@xyz.com\nSubject: Quotation for RFQ-2024-001\n\nSUPPLIER_ID: XYZ-001\nPRICE: 450000\nDELIVERY_DAYS: 12\nPAYMENT_TERMS: Net 30"
+  }'
+
+
+
+
 gcloud iam service-accounts create adk-local \
   --project=data-engineering-479617 \
   --display-name="ADK Local Development SA"
