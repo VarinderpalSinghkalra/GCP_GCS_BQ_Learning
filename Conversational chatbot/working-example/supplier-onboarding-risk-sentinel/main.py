@@ -1,15 +1,10 @@
 from root_agent import onboard_supplier
-from flask import jsonify
+from negotiate_rfq import negotiate_rfq_handler
 
 def onboard_supplier_http(request):
-    """
-    Cloud Functions Gen2 HTTP entry point
-    """
-    request_json = request.get_json(silent=True)
+    payload = request.get_json(silent=True)
+    return onboard_supplier(payload)
 
-    if not request_json:
-        return jsonify({"error": "Invalid JSON"}), 400
-
-    result = onboard_supplier(request_json)
-    return jsonify(result), 200
-
+def negotiate_rfq_http(request):
+    payload = request.get_json(silent=True)
+    return negotiate_rfq_handler(payload)
