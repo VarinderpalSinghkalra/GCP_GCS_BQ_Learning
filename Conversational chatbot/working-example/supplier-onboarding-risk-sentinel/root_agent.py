@@ -26,7 +26,9 @@ from agents.risk_scoring_agent import risk_scoring_agent
 from agents.legal_review_agent import legal_review_agent
 from agents.notification_agent import notification_agent
 
+from agents.negotiation_agent import commercial_suggestion  # advisory only
 from tools.w9_cover_page_tool import generate_w9_with_cover
+from tools.quotation_gcs_tool import store_quotation_email
 
 
 # --------------------------------------------------
@@ -66,16 +68,11 @@ def onboard_supplier(payload: dict) -> dict:
         return {
             "request_id": request_id,
             "status": "DUPLICATE",
-            "supplier_id": existing["supplier_id"],
-            "normalized_name": normalized["normalized_name"],
-            "match_key": match_key
+            "supplier_id": existing["supplier_id"]
         }
 
     supplier_id = str(uuid.uuid4())
-
-    # ✅ NORMALIZE COUNTRY (CRITICAL FIX)
-    raw_country = payload["country"]
-    country = normalize_country(raw_country)
+    country = normalize_country(payload["country"])
 
     # 2️⃣ Tax form
     tax_form = get_required_tax_form(
@@ -108,21 +105,21 @@ def onboard_supplier(payload: dict) -> dict:
     # 4️⃣ Agent pipeline
     documents = execute_agent(document_collection_agent, payload)
     validations = execute_agent(document_validation_agent, documents)
-    _ = execute_agent(compliance_agent, validations)
+    execute_agent(compliance_agent, validations)
 
     risk = execute_agent(
         risk_scoring_agent,
-        {
-            "supplier_name": normalized["normalized_name"],
-            "country": country
-        }
+        {"supplier_name": normalized["normalized_name"], "country": country}
     )
 
     risk_score = int(risk.get("risk_score", 20))
     risk_reason = risk.get("risk_reason", "Default risk logic")
     risk_level = classify_risk(risk_score)
 
-    # 5️⃣ Decision + Legal
+    quotation_gcs_uri = None
+    commercial_ai_suggestion = None
+
+    # 5️⃣ HARD STOP — SANCTIONS
     if country in SANCTIONED_COUNTRIES:
         decision = "REJECTED"
         risk_level = "HIGH"
@@ -135,34 +132,68 @@ def onboard_supplier(payload: dict) -> dict:
             "risk_reason": risk_reason
         }
 
-    elif risk_level == "LOW":
-        decision = "APPROVED"
-        legal_review = {
-            "status": "COMPLETED",
-            "review": "No legal issues identified"
-        }
-
-    elif risk_level == "MEDIUM":
-        decision = "MANUAL_REVIEW"
-        legal_review = execute_agent(
-            legal_review_agent,
-            {"country": country, "risk_reason": risk_reason}
-        )
-
+    # 6️⃣ NON-SANCTIONED FLOW
     else:
-        decision = "REJECTED"
-        legal_review = execute_agent(
-            legal_review_agent,
-            {"country": country, "risk_reason": risk_reason}
-        )
+        # 📦 Store quotation email if present
+        if payload.get("raw_email"):
+            quotation_gcs_uri = store_quotation_email(
+                supplier_id=supplier_id,
+                rfq_id=payload.get("rfq_id", "UNKNOWN_RFQ"),
+                raw_email=payload["raw_email"],
+                metadata={
+                    "supplier_id": supplier_id,
+                    "country": country,
+                    "stage": "RFQ_OPEN"
+                }
+            )
 
-    # 6️⃣ Documents
+        # 🧠 Advisory AI only (no decision power)
+        if quotation_gcs_uri:
+            commercial_ai_suggestion = commercial_suggestion(
+                {
+                    "supplier_id": supplier_id,
+                    "supplier_name": normalized["normalized_name"],
+                    "country": country,
+                    "quotation_gcs_uri": quotation_gcs_uri
+                }
+            )
+
+        # 🔑 FINAL DECISION LOGIC (CORRECT)
+        if quotation_gcs_uri:
+            # RFQ still open → cannot approve
+            decision = "MANUAL_REVIEW"
+            legal_review = {
+                "status": "PENDING",
+                "review": "Quotation received; RFQ negotiation pending"
+            }
+
+        elif risk_level == "LOW":
+            decision = "APPROVED"
+            legal_review = {
+                "status": "COMPLETED",
+                "review": "No legal issues identified"
+            }
+
+        elif risk_level == "MEDIUM":
+            decision = "MANUAL_REVIEW"
+            legal_review = execute_agent(
+                legal_review_agent,
+                {"country": country, "risk_reason": risk_reason}
+            )
+
+        else:
+            decision = "REJECTED"
+            legal_review = execute_agent(
+                legal_review_agent,
+                {"country": country, "risk_reason": risk_reason}
+            )
+
+    # 7️⃣ Documents
     if decision in {"APPROVED", "MANUAL_REVIEW"}:
         if tax_form == "W-9" and country == "US":
             template_bytes = load_gcs_file(W9_TEMPLATE_URI)
             final_pdf = generate_w9_with_cover(
-                template_bytes,
-                normalized["normalized_name"]
+                template_bytes, normalized["normalized_name"]
             )
 
             gcs_uri = upload_approved_document(
@@ -186,7 +217,7 @@ def onboard_supplier(payload: dict) -> dict:
         if gcs_uri:
             add_approved_document(supplier_id, tax_form, gcs_uri)
 
-    # 7️⃣ Email
+    # 8️⃣ Email
     if should_send_notification(decision):
         email = execute_agent(
             notification_agent,
@@ -195,7 +226,8 @@ def onboard_supplier(payload: dict) -> dict:
                 "decision": decision,
                 "risk_level": risk_level,
                 "country": country,
-                "is_sanctioned": country in SANCTIONED_COUNTRIES
+                "is_sanctioned": country in SANCTIONED_COUNTRIES,
+                "commercial_ai_suggestion": commercial_ai_suggestion
             }
         )
 
@@ -203,7 +235,7 @@ def onboard_supplier(payload: dict) -> dict:
         if recipients:
             send_email(recipients, email["subject"], email["body"])
 
-    # 8️⃣ Final Firestore
+    # 9️⃣ Final Firestore update
     update_supplier(
         supplier_id,
         {
@@ -212,20 +244,16 @@ def onboard_supplier(payload: dict) -> dict:
             "risk_score": risk_score,
             "risk_reason": risk_reason,
             "legal_review": legal_review,
-            "w9_status": (
-                "DRAFT_WITH_SUPPLIER_NAME"
-                if tax_form == "W-9" and decision != "REJECTED"
-                else None
-            )
+            "commercial_ai_suggestion": commercial_ai_suggestion,
+            "quotation_gcs_uri": quotation_gcs_uri
         }
     )
 
     return {
         "request_id": request_id,
         "supplier_id": supplier_id,
-        "normalized_name": normalized["normalized_name"],
-        "match_key": match_key,
-        "tax_form": tax_form,
+        "decision": decision,
         "risk_level": risk_level,
-        "decision": decision
+        "quotation_gcs_uri": quotation_gcs_uri,
+        "commercial_ai_suggestion": commercial_ai_suggestion
     }
