@@ -8,6 +8,17 @@ gcloud functions deploy onboard_supplier \
   --allow-unauthenticated \
   --memory 512MB
 
+gcloud functions deploy quotation_gcs_to_bq \
+  --gen2 \
+  --runtime python312 \
+  --region us-central1 \
+  --source . \
+  --entry-point quotation_gcs_to_bq \
+  --trigger-event google.storage.object.finalize \
+  --trigger-resource supplier-onboarding-risk-sentinel \
+  --memory 512MB
+
+
 
 gcloud run services logs read onboard-supplier   --region us-central1   --project platform-support-analyst-57565   --limit 50
 
