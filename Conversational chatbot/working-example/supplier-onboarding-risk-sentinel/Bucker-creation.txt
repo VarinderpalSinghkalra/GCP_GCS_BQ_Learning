@@ -1,0 +1,3 @@
+gcloud storage buckets create gs://supplier-onboarding-risk-sentinel \
+  --location=asia-south1 \
+  --uniform-bucket-level-access
