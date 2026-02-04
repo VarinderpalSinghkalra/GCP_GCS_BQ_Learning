@@ -8,6 +8,11 @@ gcloud functions deploy onboard_supplier \
   --allow-unauthenticated \
   --memory 512MB
 
+gcloud projects add-iam-policy-binding data-engineering-479617 \
+  --member="serviceAccount:service-277069041958@gs-project-accounts.iam.gserviceaccount.com" \
+  --role="roles/pubsub.publisher"
+
+
 gcloud functions deploy quotation_gcs_to_bq \
   --gen2 \
   --runtime python312 \
