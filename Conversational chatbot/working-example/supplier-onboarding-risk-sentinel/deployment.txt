@@ -8,6 +8,18 @@ gcloud functions deploy onboard_supplier \
   --allow-unauthenticated \
   --memory 512MB
 
+gcloud functions deploy negotiate_rfq \
+  --gen2 \
+  --runtime python312 \
+  --region us-central1 \
+  --source . \
+  --entry-point negotiate_rfq_http \
+  --trigger-http \
+  --allow-unauthenticated \
+  --memory 512MB \
+  --timeout 120s
+
+
 gcloud projects add-iam-policy-binding data-engineering-479617 \
   --member="serviceAccount:service-277069041958@gs-project-accounts.iam.gserviceaccount.com" \
   --role="roles/pubsub.publisher"
