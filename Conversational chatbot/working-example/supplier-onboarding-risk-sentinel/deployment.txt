@@ -36,6 +36,21 @@ gcloud functions deploy quotation_gcs_to_bq \
   --memory 512MB
 
 
+curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/onboard_supplier \
+  -H "Content-Type: application/json" \
+  -d '{
+    "supplier_name": "Betaqaqqik Consulting Pvt Ltd",
+    "country": "UNITED STATES",
+    "supplier_type": "COMPANY",
+    "rfq_id": "RFQ-TEST-9002",
+    "raw_email": "From: beta@beta.com\nSubject: Quotation for RFQ-TEST-9002\n\nSUPPLIER_ID: BETA\nUNIT_PRICE: 500000\nDELIVERY_DAYS: 10\nPAYMENT_TERMS: Net 30"
+  }'
+
+curl -X POST https://us-central1-data-engineering-479617.cloudfunctions.net/negotiate_rfq \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rfq_id": "RFQ-TEST-9002"
+  }'
 
 
 
