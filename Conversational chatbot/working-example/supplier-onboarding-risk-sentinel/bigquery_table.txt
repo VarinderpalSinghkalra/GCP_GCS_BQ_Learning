@@ -1,0 +1,11 @@
+CREATE TABLE conversational_demo.supplier_quotations (
+  rfq_id STRING,
+  supplier_id STRING,
+  supplier_name STRING,
+  unit_price FLOAT64,
+  delivery_days INT64,
+  payment_terms STRING,
+  risk_score INT64,
+  quotation_gcs_uri STRING,
+  created_at TIMESTAMP
+);
