@@ -1,0 +1,10 @@
+Step 1 – Install Terraform :- terraform --version
+Step 2 – Configure AWS :- aws configure
+Step 3 – Initialize :- terraform init
+Step 4 – Validate :- terraform validate
+Step 5 – Deploy :- terraform apply -auto-approve
+
+
+
+
+To Destroy :- terraform destroy -auto-approve
