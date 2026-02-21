@@ -1,0 +1,1 @@
+public_key_path = "./docker-key.pub"
