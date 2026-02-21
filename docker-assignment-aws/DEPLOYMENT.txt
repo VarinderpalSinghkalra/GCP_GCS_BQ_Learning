@@ -1,0 +1,16 @@
+Step 1: Create Folder :- mkdir docker-assignment-aws
+cd docker-assignment-aws
+
+Step 2: Generate SSH Key :- ssh-keygen -t rsa -b 4096 -f docker-key
+
+DEPLOYMENT STEPS
+
+Step 1: Initialize :- terraform init
+Step 2: Validate :- terraform validate
+Step 3: Plan :- terraform plan
+Step 4: Apply :- terraform apply
+
+
+CLEAN UP :- terraform destroy
+
+
