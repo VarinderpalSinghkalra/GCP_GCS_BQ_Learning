@@ -1,268 +1,336 @@
-S2CIQ – Enterprise Architecture
+Autonomous P2P Exception Resolution Platform
 
-Autonomous P2P Resolution Engine on Google Cloud
-
-⸻
-
-1. Executive Architecture Overview
-
-S2CIQ is a cloud-native, event-driven, multi-agent AI platform designed to autonomously resolve Procure-to-Pay (P2P) discrepancies between Purchase Orders and Invoices.
-
-The system leverages:
-	•	Serverless microservices
-	•	Multi-agent AI reasoning (ADK + Gemini)
-	•	Event-driven orchestration
-	•	Real-time financial analytics
-	•	Explainable AI audit trails
+Enterprise Production Architecture (Google Cloud + SAP S/4HANA)
 
 ⸻
 
-2. Architectural Principles
-	1.	Serverless-first design
-	2.	Event-driven decoupling
-	3.	Agent-based AI reasoning
-	4.	Explainability by default
-	5.	Infrastructure as Code (Terraform)
-	6.	Enterprise-grade security & governance
+1️⃣ Executive Architecture Overview
 
 ⸻
 
-3. Logical Architecture Layers
+2️⃣ Enterprise Architecture Layers
 
-┌──────────────────────────────────────────┐
-│ Presentation Layer (InvoiceAI / ContractsAI) │
-└──────────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────┐
-│ API & Application Layer (Cloud Run)     │
-└──────────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────┐
-│ Event & Orchestration Layer             │
-│ Pub/Sub + Cloud Workflows               │
-└──────────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────┐
-│ AI Workforce Layer (ADK Agents)         │
-│ Orchestrator + Specialized Agents       │
-└──────────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────┐
-│ Data Layer (Firestore + BigQuery)       │
-└──────────────────────────────────────────┘
-                    ↓
-┌──────────────────────────────────────────┐
-│ Analytics & ROI Layer (Looker Studio)   │
-└──────────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│ SAP S/4HANA (On-Prem / RISE / Private)   │
+└────────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────────┐
+│ Secure Integration Layer                  │
+│ SAP API Mgmt / OAuth / VPN / Interconnect │
+└────────────────────────────────────────────┘
+                    │
+                    ▼
+┌────────────────────────────────────────────┐
+│ ERP Adapter Layer (Cloud Run)             │
+└────────────────────────────────────────────┘
+                    ▼
+┌────────────────────────────────────────────┐
+│ Event Backbone (Pub/Sub)                  │
+└────────────────────────────────────────────┘
+                    ▼
+┌────────────────────────────────────────────┐
+│ Workflow Orchestration (Cloud Workflows)  │
+└────────────────────────────────────────────┘
+                    ▼
+┌────────────────────────────────────────────┐
+│ AI Workforce Layer (ADK + A2A Framework)  │
+│ Matcher → Resolver → Risk Classifier      │
+└────────────────────────────────────────────┘
+                    ▼
+┌────────────────────────────────────────────┐
+│ Data & Audit Layer (Firestore + BQ)       │
+└────────────────────────────────────────────┘
+                    ▼
+┌────────────────────────────────────────────┐
+│ ERP Write-Back & Finance Controls         │
+└────────────────────────────────────────────┘
 
 
 ⸻
 
-4. Physical Architecture (GCP Services Mapping)
+3️⃣ Secure SAP Integration Architecture
 
-Layer	Google Cloud Services
-Frontend	React hosted on Cloud Run or Firebase Hosting
-API	Cloud Run
-Messaging	Pub/Sub
-Workflow	Cloud Workflows
-AI Runtime	Cloud Run (ADK agents)
-AI Model	Gemini 2.0 Flash
-Document Extraction	Document AI
-Operational Storage	Firestore
-Analytical Storage	BigQuery
-Visualization	Looker Studio
-CI/CD	Cloud Build
-Infra	Terraform
+Connectivity Options
 
+Scenario	Method
+SAP On-Prem	Cloud VPN / Dedicated Interconnect
+RISE with SAP	Private Service Connect
+SAP BTP	OAuth-secured API
 
-⸻
-
-5. End-to-End Processing Flow
-
-Step 1 – Invoice Ingestion
-	•	User uploads invoice via InvoiceAI.
-	•	Stored in Cloud Storage.
-	•	Object creation event published to Pub/Sub.
+Security Controls
+	•	Mutual TLS
+	•	SAP OAuth2 token exchange
+	•	Service Account IAM isolation
+	•	IP allowlisting
+	•	Audit logging enabled
 
 ⸻
 
-Step 2 – Document Extraction
-	•	Cloud Run extraction service consumes event.
-	•	Calls Document AI processor.
-	•	Structured JSON stored in Firestore.
+4️⃣ ERP Adapter Layer (Production-Grade)
 
-⸻
+Service: Cloud Run (private, VPC-connected)
 
-Step 3 – AI Resolution Workflow
+Responsibilities:
+	•	Validate SAP JSON payload
+	•	Flatten nested items
+	•	Idempotency handling
+	•	Deduplication check
+	•	Publish invoice event
+	•	Store raw payload in Cloud Storage (audit)
 
-Cloud Workflow triggered:
-	1.	Retrieve PO data (ERP or mock service)
-	2.	Retrieve contract data (ContractsAI)
-	3.	Invoke Orchestrator Agent
-	4.	Delegate to:
-	•	Price Resolver Agent
-	•	Tax Auditor Agent
-	5.	Aggregate results
-	6.	Produce resolution decision
+Each invoice becomes:
 
-⸻
+{
+  "event_id": "uuid",
+  "invoice_id": "5166392332",
+  "company_code": "1000",
+  "currency": "GBP",
+  "exchange_rate": 0.89973,
+  "items": [...]
+}
 
-Step 4 – Decision Management
-
-Decision states:
-	•	AUTO_APPROVED
-	•	REVIEW_REQUIRED
-	•	ESCALATED
-
-Results stored in:
-	•	Firestore (operational)
-	•	BigQuery (analytical)
-
-⸻
-
-Step 5 – Shadow Mode (Governance Phase)
-
-During rollout:
-	•	AI decision recorded
-	•	Human decision recorded
-	•	Deviation tracked
-	•	Confidence scoring applied
-
-ERP write-back enabled only after threshold validation (<5% deviation).
-
-⸻
-
-6. AI Workforce Architecture
-
-Orchestrator Agent
-	•	Lifecycle controller
-	•	Delegates tasks
-	•	Aggregates reasoning
-	•	Produces explainable decision log
-
-Price Resolver Agent
-	•	Compares PO, invoice, contract price
-	•	Applies tolerance rule (e.g., 5%)
-	•	Handles unit normalization
-
-Tax Auditor Agent
-	•	Validates tax code
-	•	Cross-references ERP tax master
-	•	Validates shipping logic
-
-All agents:
+Design Principles:
 	•	Stateless
-	•	API-invokable
-	•	Containerized
+	•	Retry-safe
+	•	Idempotent
 	•	Horizontally scalable
 
 ⸻
 
-7. Data Architecture
+5️⃣ Event Backbone Architecture (Enterprise Grade)
 
-Firestore (Operational Store)
+Technology: Pub/Sub
+
+Topics:
+	•	invoice-received
+	•	matching-tasks
+	•	resolution-tasks
+	•	decision-events
+	•	erp-writeback
+
+Dead Letter Topics:
+	•	invoice-dlq
+	•	agent-dlq
+
+Features:
+	•	At-least-once delivery
+	•	Retry policies
+	•	Ordering keys per invoice
+	•	Message retention 7–30 days
+
+⸻
+
+6️⃣ Workflow Orchestration Layer
+
+Service: Cloud Workflows
+
+Production Logic:
+	1.	Receive invoice event
+	2.	Fetch PO & GR details from SAP
+	3.	Call Matcher Agent
+	4.	If no exception → Auto-Post
+	5.	If exception:
+	•	Create Agent Card
+	•	Publish to Resolver
+	6.	Await resolution response
+	7.	Risk Scoring
+	8.	Final Decision
+	9.	ERP Write-back
+	10.	Log audit trail
+
+Workflows provide:
+	•	Controlled sequencing
+	•	State tracking
+	•	Timeout handling
+	•	Compensation logic
+
+⸻
+
+7️⃣ AI Workforce Architecture (ADK + A2A)
+
+Agent 1: Matcher (Deterministic Layer)
+	•	3-way match logic
+	•	UoM normalization
+	•	GR validation
+	•	Tax code alignment
+	•	Tolerance checks
+
+No LLM here. Fully deterministic.
+
+⸻
+
+Agent 2: Resolver (LLM-Based via Gemini)
+
+Runs only when exceptions exist.
+
+Capabilities:
+	•	Currency normalization reasoning
+	•	Contract override interpretation
+	•	Freight allocation reasoning
+	•	Unit mismatch reasoning
+	•	Tax jurisdiction inference
+
+Uses:
+	•	Gemini (via Vertex AI)
+	•	Structured prompting
+	•	Guardrails
+	•	Temperature near 0 (deterministic reasoning)
+
+⸻
+
+Agent 3: Risk Classifier (Optional Enterprise Layer)
+
+Classifies:
+	•	Low risk → Auto-Approve
+	•	Medium → Human review
+	•	High → Block
+
+Adds:
+	•	Confidence scoring
+	•	Supplier risk scoring
+	•	Historical deviation trend
+
+⸻
+
+8️⃣ A2A Framework (Enterprise Messaging Standard)
+
+Agent-to-Agent communication via Pub/Sub.
+
+Each Agent Card contains:
+
+{
+  "task_id": "INV5166392332-00010",
+  "correlation_id": "workflow_id",
+  "exception_type": "PRICE_VARIANCE",
+  "context_payload": {...},
+  "priority": "HIGH",
+  "jwt_signature": "signed"
+}
+
+Security:
+	•	Signed JWT
+	•	Correlation IDs
+	•	Immutable event logs
+	•	Encrypted payload (optional)
+
+⸻
+
+9️⃣ Data Architecture
+
+Operational Store – Firestore
 
 Collections:
 	•	invoices
-	•	extraction_results
-	•	agent_decisions
+	•	invoice_items
+	•	agent_tasks
+	•	resolution_decisions
 	•	human_overrides
 
-BigQuery (Analytical Store)
+Used for:
+	•	Real-time status
+	•	Workflow tracking
 
-Fact Table:
+⸻
 
-fact_invoice_resolution
+Analytical Store – BigQuery
+
+Fact Tables:
+	•	fact_invoice_resolution
+	•	fact_exception
+	•	fact_currency_variance
+	•	fact_supplier_risk
 
 Dimensions:
-	•	vendor
+	•	supplier
+	•	company_code
+	•	plant
+	•	currency
 	•	exception_type
-	•	region
 	•	time
 
-Metrics:
-	•	touchless_rate
-	•	avg_resolution_time
-	•	manual_hours_saved
-	•	early_payment_discount_captured
-	•	agent_confidence_score
+Enables:
+	•	Touchless resolution %
+	•	Exception root cause clustering
+	•	Currency-related variance trends
+	•	Audit traceability
 
 ⸻
 
-8. Security & Governance Architecture
-	•	IAM Least Privilege Model
-	•	Dedicated Service Accounts per microservice
-	•	Private Service Access for Document AI
-	•	CMEK encryption (optional enterprise mode)
-	•	Audit Logging enabled
-	•	BigQuery row-level security
-	•	VPC Serverless Connector
+10️⃣ Security & Compliance Model
 
-Compliance-ready for:
-	•	SOX
-	•	Internal Audit
-	•	Finance Controls
+Control	Implementation
+IAM	Least privilege per service
+Encryption	CMEK optional
+Data residency	Region-controlled
+Audit logs	Enabled
+PII masking	Tokenization layer
+SOX Compliance	Immutable logs
+Segregation of Duties	Agent separation
+
 
 ⸻
 
-9. Scalability Model
+11️⃣ Scalability & Reliability
 
-Component	Scaling Mechanism
-Cloud Run	Auto-scale based on requests
-Pub/Sub	Horizontal event streaming
-Firestore	Multi-region replication
-BigQuery	Serverless auto-scaling
-ADK Agents	Stateless container scaling
+Layer	Scaling
+Cloud Run	Auto-scale
+Pub/Sub	Horizontal
+Firestore	Multi-region
+BigQuery	Serverless
+Agents	Stateless containers
 
 Supports:
-	•	10 invoices/day → 1M invoices/day
+	•	100k+ invoices/day
+	•	Parallel line-item processing
+	•	Multi-company support
+	•	Multi-currency normalization
 
 ⸻
 
-10. Deployment Architecture
+12️⃣ Autonomous Write-Back Strategy
 
-Environment Strategy:
-	•	Dev (Sandbox)
-	•	QA (Shadow Mode)
-	•	Prod (Autonomous Mode)
+Phase 1 – Shadow Mode
+	•	AI decision stored
+	•	Human decision stored
+	•	Deviation analysis
 
-Terraform Modules:
+Phase 2 – Controlled Autonomy
+	•	Low-risk auto-post
+	•	Medium-risk review
 
-modules/
-  networking/
-  pubsub/
-  workflows/
-  cloud_run/
-  document_ai/
-  firestore/
-  bigquery/
-  iam/
-
-CI/CD:
-	•	Cloud Build triggers
-	•	Artifact Registry
-	•	Canary rollout strategy
+Phase 3 – Full Autonomy
+	•	ERP write-back via SAP API
+	•	Exception auto-resolution
 
 ⸻
 
-11. Value Realization Architecture
-
-The ROI Dashboard provides:
-	•	Touchless Resolution %
-	•	Cost Avoidance
-	•	Exception Trend Analysis
-	•	Vendor Compliance Score
-	•	AI Decision Confidence Index
-
-This transforms the system from automation to decision intelligence platform.
+13️⃣ Observability & Monitoring
+	•	Cloud Monitoring dashboards
+	•	Error rate tracking
+	•	Agent latency metrics
+	•	Resolution time SLA tracking
+	•	Pub/Sub backlog monitoring
+	•	LLM token usage monitoring
 
 ⸻
 
-12. Architectural Classification
+Enterprise Classification
 
-This solution is categorized as:
-	•	Cloud-Native Microservices Architecture
-	•	Event-Driven System
-	•	Multi-Agent AI Orchestration Platform
-	•	Finance Automation AI System
-	•	Explainable AI Architecture
+This platform qualifies as:
+	•	Autonomous Finance AI Platform
+	•	Event-Driven Enterprise System
+	•	Multi-Agent AI Architecture
+	•	SAP-Integrated AI Middleware
+	•	Decision Intelligence System
+
+⸻
+
+Business Outcome
+
+Achieves:
+	•	80–90% touchless resolution
+	•	Reduced manual review workload
+	•	Faster posting cycles
+	•	Improved vendor satisfaction
+	•	Full audit transparency.
