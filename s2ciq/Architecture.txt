@@ -1,0 +1,268 @@
+S2CIQ – Enterprise Architecture
+
+Autonomous P2P Resolution Engine on Google Cloud
+
+⸻
+
+1. Executive Architecture Overview
+
+S2CIQ is a cloud-native, event-driven, multi-agent AI platform designed to autonomously resolve Procure-to-Pay (P2P) discrepancies between Purchase Orders and Invoices.
+
+The system leverages:
+	•	Serverless microservices
+	•	Multi-agent AI reasoning (ADK + Gemini)
+	•	Event-driven orchestration
+	•	Real-time financial analytics
+	•	Explainable AI audit trails
+
+⸻
+
+2. Architectural Principles
+	1.	Serverless-first design
+	2.	Event-driven decoupling
+	3.	Agent-based AI reasoning
+	4.	Explainability by default
+	5.	Infrastructure as Code (Terraform)
+	6.	Enterprise-grade security & governance
+
+⸻
+
+3. Logical Architecture Layers
+
+┌──────────────────────────────────────────┐
+│ Presentation Layer (InvoiceAI / ContractsAI) │
+└──────────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────┐
+│ API & Application Layer (Cloud Run)     │
+└──────────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────┐
+│ Event & Orchestration Layer             │
+│ Pub/Sub + Cloud Workflows               │
+└──────────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────┐
+│ AI Workforce Layer (ADK Agents)         │
+│ Orchestrator + Specialized Agents       │
+└──────────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────┐
+│ Data Layer (Firestore + BigQuery)       │
+└──────────────────────────────────────────┘
+                    ↓
+┌──────────────────────────────────────────┐
+│ Analytics & ROI Layer (Looker Studio)   │
+└──────────────────────────────────────────┘
+
+
+⸻
+
+4. Physical Architecture (GCP Services Mapping)
+
+Layer	Google Cloud Services
+Frontend	React hosted on Cloud Run or Firebase Hosting
+API	Cloud Run
+Messaging	Pub/Sub
+Workflow	Cloud Workflows
+AI Runtime	Cloud Run (ADK agents)
+AI Model	Gemini 2.0 Flash
+Document Extraction	Document AI
+Operational Storage	Firestore
+Analytical Storage	BigQuery
+Visualization	Looker Studio
+CI/CD	Cloud Build
+Infra	Terraform
+
+
+⸻
+
+5. End-to-End Processing Flow
+
+Step 1 – Invoice Ingestion
+	•	User uploads invoice via InvoiceAI.
+	•	Stored in Cloud Storage.
+	•	Object creation event published to Pub/Sub.
+
+⸻
+
+Step 2 – Document Extraction
+	•	Cloud Run extraction service consumes event.
+	•	Calls Document AI processor.
+	•	Structured JSON stored in Firestore.
+
+⸻
+
+Step 3 – AI Resolution Workflow
+
+Cloud Workflow triggered:
+	1.	Retrieve PO data (ERP or mock service)
+	2.	Retrieve contract data (ContractsAI)
+	3.	Invoke Orchestrator Agent
+	4.	Delegate to:
+	•	Price Resolver Agent
+	•	Tax Auditor Agent
+	5.	Aggregate results
+	6.	Produce resolution decision
+
+⸻
+
+Step 4 – Decision Management
+
+Decision states:
+	•	AUTO_APPROVED
+	•	REVIEW_REQUIRED
+	•	ESCALATED
+
+Results stored in:
+	•	Firestore (operational)
+	•	BigQuery (analytical)
+
+⸻
+
+Step 5 – Shadow Mode (Governance Phase)
+
+During rollout:
+	•	AI decision recorded
+	•	Human decision recorded
+	•	Deviation tracked
+	•	Confidence scoring applied
+
+ERP write-back enabled only after threshold validation (<5% deviation).
+
+⸻
+
+6. AI Workforce Architecture
+
+Orchestrator Agent
+	•	Lifecycle controller
+	•	Delegates tasks
+	•	Aggregates reasoning
+	•	Produces explainable decision log
+
+Price Resolver Agent
+	•	Compares PO, invoice, contract price
+	•	Applies tolerance rule (e.g., 5%)
+	•	Handles unit normalization
+
+Tax Auditor Agent
+	•	Validates tax code
+	•	Cross-references ERP tax master
+	•	Validates shipping logic
+
+All agents:
+	•	Stateless
+	•	API-invokable
+	•	Containerized
+	•	Horizontally scalable
+
+⸻
+
+7. Data Architecture
+
+Firestore (Operational Store)
+
+Collections:
+	•	invoices
+	•	extraction_results
+	•	agent_decisions
+	•	human_overrides
+
+BigQuery (Analytical Store)
+
+Fact Table:
+
+fact_invoice_resolution
+
+Dimensions:
+	•	vendor
+	•	exception_type
+	•	region
+	•	time
+
+Metrics:
+	•	touchless_rate
+	•	avg_resolution_time
+	•	manual_hours_saved
+	•	early_payment_discount_captured
+	•	agent_confidence_score
+
+⸻
+
+8. Security & Governance Architecture
+	•	IAM Least Privilege Model
+	•	Dedicated Service Accounts per microservice
+	•	Private Service Access for Document AI
+	•	CMEK encryption (optional enterprise mode)
+	•	Audit Logging enabled
+	•	BigQuery row-level security
+	•	VPC Serverless Connector
+
+Compliance-ready for:
+	•	SOX
+	•	Internal Audit
+	•	Finance Controls
+
+⸻
+
+9. Scalability Model
+
+Component	Scaling Mechanism
+Cloud Run	Auto-scale based on requests
+Pub/Sub	Horizontal event streaming
+Firestore	Multi-region replication
+BigQuery	Serverless auto-scaling
+ADK Agents	Stateless container scaling
+
+Supports:
+	•	10 invoices/day → 1M invoices/day
+
+⸻
+
+10. Deployment Architecture
+
+Environment Strategy:
+	•	Dev (Sandbox)
+	•	QA (Shadow Mode)
+	•	Prod (Autonomous Mode)
+
+Terraform Modules:
+
+modules/
+  networking/
+  pubsub/
+  workflows/
+  cloud_run/
+  document_ai/
+  firestore/
+  bigquery/
+  iam/
+
+CI/CD:
+	•	Cloud Build triggers
+	•	Artifact Registry
+	•	Canary rollout strategy
+
+⸻
+
+11. Value Realization Architecture
+
+The ROI Dashboard provides:
+	•	Touchless Resolution %
+	•	Cost Avoidance
+	•	Exception Trend Analysis
+	•	Vendor Compliance Score
+	•	AI Decision Confidence Index
+
+This transforms the system from automation to decision intelligence platform.
+
+⸻
+
+12. Architectural Classification
+
+This solution is categorized as:
+	•	Cloud-Native Microservices Architecture
+	•	Event-Driven System
+	•	Multi-Agent AI Orchestration Platform
+	•	Finance Automation AI System
+	•	Explainable AI Architecture
