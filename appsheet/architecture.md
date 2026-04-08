@@ -1,18 +1,18 @@
-
 =====================================================
 PROJECT: Case Management Dashboard Architecture
 =====================================================
 
 OVERVIEW:
-This system integrates Salesforce (conceptual), AppSheet, and Google Chat
-to provide a no-backend case management solution with real-time notifications.
+This system integrates a Buying Hub (external system), Salesforce,
+AppSheet, and Google Chat to provide a no-backend case management
+solution with real-time notifications and dashboard visibility.
 
 -----------------------------------------------------
 END-TO-END FLOW
 -----------------------------------------------------
 
-1. Customer sends email
-2. Salesforce Email-to-Case creates a Case
+1. Buying Hub system sends case data
+2. Salesforce receives data and creates Case records
 3. Case data is stored in Google Sheets (data layer)
 4. AppSheet reads and syncs case data
 5. Dashboard updates with latest case information
@@ -25,7 +25,9 @@ END-TO-END FLOW
 ARCHITECTURE FLOW (LINEAR)
 -----------------------------------------------------
 
-Salesforce (Email-to-Case)
+Buying Hub System
+        ↓
+Salesforce (Case Creation)
         ↓
 Case Object
         ↓
@@ -44,21 +46,28 @@ SYSTEM COMPONENTS
 -----------------------------------------------------
 
 1. SOURCE SYSTEM:
-   - Salesforce
-   - Handles case creation and lifecycle
+   - Buying Hub System
+   - Sends structured case data to Salesforce
 
-2. DATA LAYER:
+2. CRM LAYER:
+   - Salesforce
+   - Handles case creation and lifecycle management
+
+3. DATA LAYER:
    - Google Sheets
    - Stores structured case data
+   - Acts as integration bridge
 
-3. APPLICATION LAYER:
+4. APPLICATION LAYER:
    - AppSheet
    - Dashboard (Table, Charts, KPI)
    - Automation (Bots, Conditions)
+   - Business logic (Pending count, filters)
 
-4. NOTIFICATION LAYER:
+5. NOTIFICATION LAYER:
    - Google Chat
    - Receives webhook alerts
+   - Enables real-time team communication
 
 -----------------------------------------------------
 AUTOMATION LOGIC
@@ -93,6 +102,7 @@ KEY FEATURES
 - Automated notifications via webhook
 - Pending case tracking
 - No backend architecture
+- Lightweight and scalable design
 - Easy integration and deployment
 
 -----------------------------------------------------
@@ -101,22 +111,23 @@ LIMITATIONS
 
 - No direct Salesforce-AppSheet integration
 - Depends on Google Sheets sync
-- Limited error handling
-- Not fully real-time
+- Limited error handling and retry mechanism
+- Near real-time (based on sync frequency)
 
 -----------------------------------------------------
 FUTURE ENHANCEMENTS
 -----------------------------------------------------
 
 - Add GCP Cloud Functions (middleware)
-- Replace Sheets with Cloud SQL / BigQuery
-- Add retry & logging mechanism
-- Implement AI-based prioritization
+- Replace Google Sheets with Cloud SQL / BigQuery
+- Implement retry & logging mechanism
+- Add monitoring and alerting
+- AI-based case prioritization
 
 -----------------------------------------------------
 FINAL ARCHITECTURE SUMMARY
 -----------------------------------------------------
 
-Salesforce → Google Sheets → AppSheet → Google Chat
+Buying Hub → Salesforce → Google Sheets → AppSheet → Google Chat
 
 =====================================================
