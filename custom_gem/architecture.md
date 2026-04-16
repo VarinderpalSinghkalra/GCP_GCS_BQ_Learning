@@ -1,287 +1,228 @@
 CIR Pre-Check Co-Pilot
 
-Enterprise Architecture (Google Cloud Platform)
+Enterprise Architecture (GCP)
 
 ⸻
 
 1. Executive Summary
 
-CIR Pre-Check Co-Pilot is an AI-driven contract validation platform designed to automate pre-submission checks for contracts. It leverages Generative AI, document processing, and cloud-native services to identify risks, inconsistencies, and compliance issues.
+CIR Pre-Check Co-Pilot is an AI-powered contract validation platform that automates pre-submission checks by identifying:
 
-The solution is built on Google Cloud Platform (GCP) using a serverless, scalable, and secure architecture, ensuring high availability and minimal operational overhead.
+* Errors
+* Missing clauses
+* Conflicts
+* Compliance risks
 
-⸻
-
-2. Architecture Overview
-
-High-Level System Flow
-
-Client (Web / App)
-        ↓
-API Gateway (Authentication & Routing)
-        ↓
-Cloud Run (Stateless Backend Service)
-        ↓
--------------------------------------------------
-|                Processing Pipeline             |
-|                                               |
-|  1. Cloud Storage (File Persistence)          |
-|  2. Document AI (Text Extraction)             |
-|  3. Vertex AI - Gemini (AI Analysis)          |
-|  4. Business Rules Engine                     |
--------------------------------------------------
-        ↓
-Data Layer (Firestore / BigQuery)
-        ↓
-Response to Client
+The solution is built on Google Cloud Platform (GCP) using a serverless, scalable, and secure architecture, integrating Document AI and Vertex AI (Gemini) for intelligent processing.
 
 ⸻
 
-3. Architectural Principles
+2. High-Level Pipe Architecture Diagram
 
-* Cloud-Native First: Fully managed GCP services
-* Serverless Design: No infrastructure management
-* Loose Coupling: Independent service components
-* Scalability: Auto-scaling under load
-* Security by Design: IAM-based access control
-* Extensibility: Modular pipeline for future enhancements
+[ Client (Web / App) ]
+            │
+            ▼
+[ API Gateway ]
+(Authentication | Routing | Rate Limiting)
+            │
+            ▼
+[ Cloud Run (Backend Service) ]
+(Orchestration Layer)
+            │
+            ▼
+────────────── PIPELINE ──────────────
+            │
+            ▼
+[ Cloud Storage (GCS) ]
+(Store Uploaded Contracts)
+            │
+            ▼
+[ Document AI ]
+(Text Extraction & Structuring)
+            │
+            ▼
+[ Vertex AI (Gemini) ]
+(AI-Based Contract Analysis)
+            │
+            ▼
+[ Business Rules Engine ]
+(CIR Validation | Risk Scoring)
+            │
+            ▼
+────────────── OUTPUT ────────────────
+            │
+            ▼
+[ Firestore ] -------- [ BigQuery ]
+(Operational Data)      (Analytics)
+            │
+            ▼
+[ Response to Client ]
+(Structured JSON Output)
 
 ⸻
 
-4. Layered Architecture
+3. End-to-End Workflow
+
+1. User uploads contract via frontend
+2. Request is routed through API Gateway
+3. Cloud Run backend receives and validates request
+4. Contract is stored in Cloud Storage (GCS)
+5. Document AI extracts and structures text
+6. Extracted content is sent to Vertex AI (Gemini)
+7. AI performs contract validation using CIR prompt
+8. Business rules engine refines and scores output
+9. Results stored in Firestore and BigQuery
+10. Final structured response returned to user
+
+⸻
+
+4. Layered Architecture Explanation
 
 ⸻
 
 4.1 Presentation Layer
 
-Components:
-
-* Web Application (React / Angular)
-* Internal enterprise interface
-
-Responsibilities:
-
-* Contract upload (PDF, DOCX, TXT)
-* Display structured validation results
-* Trigger analysis workflows
+* Web UI / Internal application
+* Enables contract upload and result visualization
+* Provides user-friendly interface for business users
 
 ⸻
 
 4.2 API Management Layer
 
-Components:
-
-* API Gateway
-
-Responsibilities:
-
-* Centralized API entry point
-* Request routing to backend services
-* Authentication and authorization
-* Rate limiting and throttling
+* API Gateway acts as secure entry point
+* Handles:
+    * Authentication (IAM / OAuth)
+    * Traffic control
+    * Request routing
 
 ⸻
 
 4.3 Application Layer (Compute)
 
-Components:
+* Cloud Run hosts containerized backend
+* Responsibilities:
+    * Workflow orchestration
+    * Service integration
+    * Response formatting
 
-* Cloud Run (Containerized Backend)
+Why Cloud Run:
 
-Responsibilities:
-
-* Orchestrates end-to-end workflow
-* Handles file ingestion
-* Integrates with GCP services:
-    * Cloud Storage
-    * Document AI
-    * Vertex AI
-* Applies business validation rules
-* Formats structured output
-
-Key Characteristics:
-
-* Stateless execution
-* Auto-scaling
-* Container-based deployment
+* Serverless and auto-scalable
+* Minimal operational overhead
 
 ⸻
 
-4.4 Document Ingestion & Storage Layer
-
-Components:
+4.4 Storage Layer
 
 * Cloud Storage (GCS)
-
-Responsibilities:
-
-* Persistent storage of uploaded contracts
-* Version control (optional)
-* Secure and durable storage
+    * Stores raw contract files
+    * Ensures durability and scalability
 
 ⸻
 
 4.5 Document Processing Layer
 
-Components:
-
 * Document AI
-
-Responsibilities:
-
-* Extract structured text from:
-    * Native PDFs
-    * Scanned documents
-* Normalize unstructured data
-
-Business Value:
-
-* Improves accuracy of downstream AI analysis
+    * Extracts text from PDFs and scanned files
+    * Converts unstructured data into structured format
 
 ⸻
 
-4.6 AI & Intelligence Layer
-
-Components:
+4.6 AI Intelligence Layer
 
 * Vertex AI (Gemini 1.5 Pro)
-
-Responsibilities:
-
-* Perform contract analysis using predefined prompt
-* Identify:
-    * Errors
-    * Missing clauses
-    * Conflicts
-    * Compliance risks
-* Generate structured JSON output
-
-Key Advantage:
-
-* Supports large context window for long contracts
+    * Performs deep contract analysis
+    * Handles large documents
+    * Generates structured insights
 
 ⸻
 
 4.7 Business Logic Layer
 
-Components:
-
-* Embedded validation engine (within backend)
-
-Responsibilities:
-
-* Apply CIR-specific validation rules
-* Regional compliance logic:
-    * APAC
-    * EMEA
-    * CALA
-* Risk scoring and classification
-* Output standardization
+* Custom CIR validation engine
+* Applies:
+    * Compliance rules
+    * Region-specific logic
+    * Risk scoring
 
 ⸻
 
-4.8 Data & Persistence Layer
+4.8 Data Layer
 
-Components:
+Firestore
 
-* Firestore (Operational Data Store)
-* BigQuery (Analytical Data Warehouse)
+* Stores real-time results
+* Fast retrieval for UI
 
-Responsibilities:
+BigQuery
 
-Firestore:
-
-* Store real-time analysis results
-* Maintain metadata (timestamps, file references)
-
-BigQuery:
-
-* Store historical data
-* Enable analytics:
-    * Error trends
-    * Risk patterns
-    * Usage insights
+* Stores historical data
+* Enables analytics and reporting
 
 ⸻
 
-4.9 Observability & Monitoring Layer
-
-Components:
+4.9 Observability Layer
 
 * Cloud Logging
 * Cloud Monitoring
-
-Responsibilities:
-
-* Track system performance
-* Monitor API latency and failures
-* Generate alerts for anomalies
+* Alerting and performance tracking
 
 ⸻
 
-4.10 Security & Compliance Layer
+4.10 Security Layer
 
-Components:
-
-* IAM (Identity & Access Management)
-* Secret Manager
-* Encryption (at rest & in transit)
-
-Responsibilities:
-
-* Role-based access control
-* Secure credential management
-* Data protection and compliance
+* IAM for access control
+* Secret Manager for credentials
+* Encryption (default GCP)
 
 ⸻
 
-5. End-to-End Workflow
+5. Key Design Highlights
 
-1. User uploads contract via UI
-2. Request passes through API Gateway
-3. Backend service (Cloud Run) receives request
-4. Contract stored in Cloud Storage
-5. Document AI extracts text
-6. Extracted text sent to Gemini (Vertex AI)
-7. AI performs contract validation
-8. Business rules refine output
-9. Results stored in Firestore / BigQuery
-10. Structured response returned to user
+* Serverless Architecture → No infrastructure management
+* Scalable Pipeline → Handles multiple contracts concurrently
+* AI-Driven Intelligence → Automated contract validation
+* Modular Design → Easy to extend or replace components
+* Enterprise Security → IAM + encryption
 
 ⸻
 
-6. Scalability & Performance
+6. Optional Enhancements (Advanced)
 
-* Horizontal scaling via Cloud Run
-* Asynchronous processing (optional) using Pub/Sub
-* High throughput for concurrent contract processing
-* Low latency via regional deployments
-
-⸻
-
-7. Optional Enhancements
-
-* Pub/Sub for event-driven processing
+* Pub/Sub for asynchronous processing
 * Cloud Workflows for orchestration
-* Looker for business dashboards
+* Looker dashboards for analytics
 * VPC for private networking
 * CI/CD using Cloud Build
 
 ⸻
 
-8. Conclusion
+7. Final Summary
 
-This architecture transforms CIR Pre-Check Co-Pilot into a production-grade AI platform by combining:
+This architecture establishes CIR Pre-Check Co-Pilot as a:
 
-* Serverless compute
-* Intelligent document processing
-* Generative AI capabilities
-* Scalable data storage
+* Scalable AI platform
+* Automated contract validation system
+* Enterprise-ready cloud solution
 
-The system ensures automation, accuracy, scalability, and security, making it suitable for enterprise-level deployment.
+It combines:
+
+* Serverless compute (Cloud Run)
+* Intelligent document parsing (Document AI)
+* Generative AI (Gemini via Vertex AI)
+* Robust data storage (GCS, Firestore, BigQuery)
+
+⸻
+
+Outcome
+
+* Reduced manual effort
+* Faster contract validation
+* Improved compliance accuracy
+* Production-ready AI system
 
 ⸻
 
 :::
 
-⸻
