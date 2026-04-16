@@ -1,0 +1,212 @@
+Azure Cloud Project – Secure File Sharing Architecture Implementation
+
+Name: Varinder Pal Singh
+
+Project Title: Secure Cloud-Based File Sharing System using Azure
+
+
+⸻
+
+1. Introduction
+
+This project demonstrates the implementation of a secure cloud architecture using Microsoft Azure. The objective is to deploy a file-sharing application (OwnCloud) on a public subnet and a database server (MySQL) on a private subnet, ensuring security, scalability, and controlled access.
+
+The architecture follows best practices by isolating sensitive resources in a private subnet and enabling secure communication using a bastion-like approach and NAT Gateway.
+
+⸻
+
+2. Architecture Overview
+
+The solution includes:
+
+* Virtual Network (VNet)
+* Public Subnet (Application Layer)
+* Private Subnet (Database Layer)
+* NAT Gateway (for outbound internet access from private subnet)
+* Network Security Groups (NSG)
+* Ubuntu Virtual Machines
+* OwnCloud (Application)
+* MySQL (Database)
+
+⸻
+
+3. Implementation Steps
+
+⸻
+
+Step 1: Resource Group Creation
+
+* Navigated to Azure Portal → Resource Groups
+* Created a resource group named P1-RG
+* Selected region: [Enter Region]
+
+⸻
+
+Step 2: Virtual Network and Subnet Configuration
+
+* Created Virtual Network:
+    * Name: P1VNET
+    * Address Space: 10.0.0.0/16
+* Created Subnets:
+    * Public Subnet: 10.0.1.0/24
+    * Private Subnet: 10.0.2.0/24
+
+⸻
+
+Step 3: NAT Gateway Configuration
+
+* Created NAT Gateway:
+    * Name: P1-NAT
+    * Associated with Private Subnet
+* Configured:
+    * Public IP
+    * Public IP Prefix (/30)
+* Attached NAT Gateway to Private Subnet
+
+⸻
+
+Step 4: Network Security Groups (NSG)
+
+AppNSG (Application Layer)
+
+* Allowed inbound ports:
+    * 22 (SSH)
+    * 80 (HTTP)
+
+DbNSG (Database Layer)
+
+* Allowed inbound ports:
+    * 22 (SSH)
+    * 3306 (MySQL)
+
+⸻
+
+Step 5: Virtual Machine Deployment
+
+Application Server (Public VM)
+
+* OS: Ubuntu 22.04
+* Size: Standard B1s
+* Subnet: Public Subnet
+* Public IP: Enabled
+* NSG: AppNSG
+
+⸻
+
+Database Server (Private VM)
+
+* OS: Ubuntu 20.04
+* Size: Standard B1s
+* Subnet: Private Subnet
+* Public IP: Disabled
+* NSG: DbNSG
+
+⸻
+
+Step 6: Secure Access Configuration
+
+* Connected to Application VM using SSH
+* Copied database PEM key to Application VM
+* Accessed Database VM via Application VM using private IP
+
+⸻
+
+Step 7: MySQL Installation (Database Server)
+
+Executed the following commands:
+
+sudo apt update
+wget https://d6opu47qoi4ee.cloudfront.net/azure_install_mysql.sh
+sudo chmod 700 azure_install_mysql.sh
+sudo apt install dos2unix -y
+sudo dos2unix azure_install_mysql.sh
+sudo ./azure_install_mysql.sh
+
+⸻
+
+Step 8: OwnCloud Installation (Application Server)
+
+Executed:
+
+sudo apt update
+sudo add-apt-repository ppa:ondrej/php -y
+sudo apt update
+
+Installed dependencies and configured Apache.
+
+Downloaded and deployed OwnCloud:
+
+cd /var/www/html
+sudo rm *
+sudo wget https://download.owncloud.com/server/stable/owncloud-complete-latest.tar.bz2
+sudo tar -xjf owncloud-complete-latest.tar.bz2
+sudo chown -R www-data:www-data owncloud
+sudo systemctl restart apache2
+
+⸻
+
+Step 9: Application Testing
+
+* Accessed application using browser:
+    http:///owncloud
+* Verified successful deployment of OwnCloud interface
+
+⸻
+
+4. Results
+
+* Successfully deployed a secure cloud architecture
+* Application server accessible via internet
+* Database securely isolated in private subnet
+* Communication established using SSH tunneling
+* OwnCloud application successfully running
+
+⸻
+
+5. MCQ Answers
+
+1. Public IP address
+2. Priority
+3. All of these
+4. NIC
+5. At the time of creation
+6. Local machine to VPN gateway
+7. Name of virtual network
+
+⸻
+
+6. Conclusion
+
+This project demonstrates the implementation of a secure and scalable cloud architecture using Azure services. By separating application and database layers into different subnets and using NAT Gateway and NSGs, the solution ensures enhanced security and controlled access.
+
+The architecture follows real-world enterprise practices and can be extended further with load balancing, autoscaling, and monitoring solutions.
+
+⸻
+
+7. Screenshots Section
+
+(Attach all screenshots in the required order as per instructions)
+
+1. Resource Group
+2. Virtual Network
+3. Public Subnet
+4. Private Subnet
+5. NAT Gateway
+6. NSG Rules (AppNSG)
+7. NSG Rules (DbNSG)
+8. Application VM Overview
+9. Database VM Overview
+10. MySQL Installation
+11. OwnCloud Installation
+12. Application Access in Browser
+
+⸻
+
+8. Cleanup
+
+* Deleted all resources after completion to avoid unnecessary costs:
+    * Virtual Machines
+    * NAT Gateway
+    * Virtual Network
+    * Resource Group
+
