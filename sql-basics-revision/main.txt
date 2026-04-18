@@ -1,0 +1,6 @@
+SELECT * FROM `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` LIMIT 1000;
+SELECT product, category from `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` where customer_id = 'C004';
+SELECT product, category, amount from `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` where amount >= '1000';
+SELECT product, category, amount from `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` where amount >= '1000' AND city = 'Delhi' OR city = 'chandigarh';
+SELECT product, category, amount from `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` where amount >= '1000' AND city IN( 'Delhi','chandigarh');
+SELECT product, category, amount FROM `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` WHERE amount >= '1000' AND amount >= '5000' OR city IN ('Delhi','chandigarh');
