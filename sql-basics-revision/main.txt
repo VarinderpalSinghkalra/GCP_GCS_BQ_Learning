@@ -4,3 +4,33 @@ SELECT product, category, amount from `data-engineering-488013.conversational_de
 SELECT product, category, amount from `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` where amount >= '1000' AND city = 'Delhi' OR city = 'chandigarh';
 SELECT product, category, amount from `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` where amount >= '1000' AND city IN( 'Delhi','chandigarh');
 SELECT product, category, amount FROM `data-engineering-488013.conversational_demo_df.sample_spenddata_raw` WHERE amount >= '1000' AND amount >= '5000' OR city IN ('Delhi','chandigarh');
+
+
+Get employees whose salary is:
+between 30k–80k
+AND department is IT or Finance
+Write the query — I’ll check it 👍
+ANS :- Select * from employees where department IN ('IT', 'Finance') AND salary BETWEEN 30000 AND 80000;
+
+Why This Is Perfect
+
+✔ You used IN instead of multiple OR → clean and professional
+✔ You combined conditions with AND correctly
+✔ You used BETWEEN (inclusive range)
+✔ No logical mistake (parentheses not needed here)
+
+Get employees from IT or Finance
+BUT salary should be:
+between 30k–80k
+AND name starts with 'A'
+ANS :- Select * from employees where department IN ('IT', 'Finance') AND salary BETWEEN 30000 AND 80000 AND name LIKE 'A%';
+
+Why This Is Strong
+
+✔ Combined multiple conditions correctly
+✔ Used IN instead of OR → clean
+✔ Used BETWEEN correctly (inclusive)
+✔ Used LIKE 'A%' correctly for prefix match
+
+👉 This is exactly how a Data Engineer should write queries
+
