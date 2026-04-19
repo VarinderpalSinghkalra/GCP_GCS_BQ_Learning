@@ -1,25 +1,27 @@
+resource "random_string" "rand" {
+  length  = 5
+  special = false
+  upper   = false
+}
+
 resource "azurerm_resource_group" "rg" {
   name     = "storage-rg"
-  location = var.location
+  location = "East US"
 }
 
 resource "azurerm_storage_account" "storage" {
   name                     = "varinder${random_string.rand.result}"
   resource_group_name      = azurerm_resource_group.rg.name
-  location                 = var.location
+  location                 = "East US"
   account_tier             = "Standard"
   account_replication_type = "LRS"
-
-  static_website {
-    index_document     = "index.html"
-    error_404_document = "404.html"
-  }
 }
 
-resource "random_string" "rand" {
-  length  = 5
-  special = false
-  upper   = false
+# ✅ NEW (Fix for deprecated warning)
+resource "azurerm_storage_account_static_website" "static" {
+  storage_account_id = azurerm_storage_account.storage.id
+  index_document     = "index.html"
+  error_404_document = "404.html"
 }
 
 resource "azurerm_storage_blob" "index" {
