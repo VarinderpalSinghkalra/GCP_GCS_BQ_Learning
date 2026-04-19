@@ -1,8 +1,4 @@
-
 #!/bin/bash
-
-echo "Logging into Azure..."
-az login
 
 echo "Deploying VMSS..."
 cd vmss
