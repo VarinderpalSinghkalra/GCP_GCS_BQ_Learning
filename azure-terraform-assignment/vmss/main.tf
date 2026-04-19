@@ -3,7 +3,7 @@ resource "azurerm_resource_group" "rg" {
   location = var.location
 }
 
-# 🔐 Generate SSH Key (Terraform-based fix)
+# SSH Key (Terraform generated)
 resource "tls_private_key" "ssh_key" {
   algorithm = "RSA"
   rsa_bits  = 2048
@@ -11,22 +11,22 @@ resource "tls_private_key" "ssh_key" {
 
 resource "azurerm_virtual_network" "vnet" {
   name                = "vmss-vnet"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
   address_space       = ["10.0.0.0/16"]
 }
 
 resource "azurerm_subnet" "subnet" {
   name                 = "vmss-subnet"
-  resource_group_name  = var.resource_group_name
+  resource_group_name  = azurerm_resource_group.rg.name
   virtual_network_name = azurerm_virtual_network.vnet.name
   address_prefixes     = ["10.0.1.0/24"]
 }
 
 resource "azurerm_network_security_group" "nsg" {
   name                = "vmss-nsg"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
 }
 
 resource "azurerm_network_security_rule" "http" {
@@ -39,7 +39,7 @@ resource "azurerm_network_security_rule" "http" {
   source_port_range           = "*"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = var.resource_group_name
+  resource_group_name         = azurerm_resource_group.rg.name
   network_security_group_name = azurerm_network_security_group.nsg.name
 }
 
@@ -53,20 +53,19 @@ resource "azurerm_network_security_rule" "ssh" {
   source_port_range           = "*"
   source_address_prefix       = "*"
   destination_address_prefix  = "*"
-  resource_group_name         = var.resource_group_name
+  resource_group_name         = azurerm_resource_group.rg.name
   network_security_group_name = azurerm_network_security_group.nsg.name
 }
 
 resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
   name                = "vmss-demo"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
   sku                 = "Standard_B1s"
   instances           = 2
 
   admin_username = "azureuser"
 
-  # ✅ FIXED: No local file dependency
   admin_ssh_key {
     username   = "azureuser"
     public_key = tls_private_key.ssh_key.public_key_openssh
