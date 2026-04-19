@@ -17,19 +17,24 @@ resource "azurerm_storage_account" "storage" {
   account_replication_type = "LRS"
 }
 
-# ✅ NEW (Fix for deprecated warning)
+# Static website (creates $web container)
 resource "azurerm_storage_account_static_website" "static" {
   storage_account_id = azurerm_storage_account.storage.id
   index_document     = "index.html"
   error_404_document = "404.html"
 }
 
+# Wait for container
 resource "azurerm_storage_blob" "index" {
   name                   = "index.html"
   storage_account_name   = azurerm_storage_account.storage.name
   storage_container_name = "$web"
   type                   = "Block"
   source                 = "../website/index.html"
+
+  depends_on = [
+    azurerm_storage_account_static_website.static
+  ]
 }
 
 resource "azurerm_storage_blob" "error" {
@@ -38,4 +43,8 @@ resource "azurerm_storage_blob" "error" {
   storage_container_name = "$web"
   type                   = "Block"
   source                 = "../website/404.html"
+
+  depends_on = [
+    azurerm_storage_account_static_website.static
+  ]
 }
