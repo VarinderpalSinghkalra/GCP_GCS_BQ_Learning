@@ -1,0 +1,2 @@
+VMSS: Get public IP via Azure Portal
+Website: terraform output website_url
