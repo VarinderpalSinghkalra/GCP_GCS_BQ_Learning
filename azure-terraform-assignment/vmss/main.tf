@@ -3,6 +3,12 @@ resource "azurerm_resource_group" "rg" {
   location = var.location
 }
 
+# 🔐 Generate SSH Key (Terraform-based fix)
+resource "tls_private_key" "ssh_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
 resource "azurerm_virtual_network" "vnet" {
   name                = "vmss-vnet"
   location            = var.location
@@ -60,9 +66,10 @@ resource "azurerm_linux_virtual_machine_scale_set" "vmss" {
 
   admin_username = "azureuser"
 
+  # ✅ FIXED: No local file dependency
   admin_ssh_key {
     username   = "azureuser"
-    public_key = file("~/.ssh/id_rsa.pub")
+    public_key = tls_private_key.ssh_key.public_key_openssh
   }
 
   source_image_reference {
