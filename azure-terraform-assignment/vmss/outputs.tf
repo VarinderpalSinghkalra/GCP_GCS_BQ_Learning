@@ -1,3 +1,4 @@
-output "vmss_name" {
-  value = azurerm_linux_virtual_machine_scale_set.vmss.name
+output "private_key" {
+  value     = tls_private_key.ssh_key.private_key_pem
+  sensitive = true
 }
