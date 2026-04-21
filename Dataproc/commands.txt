@@ -1,0 +1,14 @@
+🚀 Option 1: Dataproc Serverless 
+
+gcloud dataproc batches submit pyspark main.py \
+  --region=us-central1 \
+  --project=data-engineering-488013 \
+  --jars=gs://spark-lib/bigquery/spark-bigquery-latest.jar
+
+
+🚀 Option 2: Dataproc Cluster
+
+gcloud dataproc jobs submit pyspark main.py \
+  --cluster=my-cluster \
+  --region=us-central1 \
+  --jars=gs://spark-lib/bigquery/spark-bigquery-latest.jar
