@@ -1,0 +1,1 @@
+gcloud dataproc batches submit pyspark main.py   --project=data-engineering-488013   --region=us-central1   --service-account=sql-bot-sa@data-engineering-488013.iam.gserviceaccount.com   --deps-bucket=datavip-dataflow
