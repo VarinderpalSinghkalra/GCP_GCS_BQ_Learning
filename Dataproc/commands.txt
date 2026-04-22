@@ -1,3 +1,14 @@
+
+cluster creation :- 
+
+gcloud dataproc clusters create my-cluster \
+  --region=us-central1 \
+  --num-workers=2 \
+  --worker-machine-type=n1-standard-2
+
+
+
+
 🚀 Option 1: Dataproc Serverless 
 
 gcloud dataproc batches submit pyspark main.py \
