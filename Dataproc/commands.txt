@@ -5,6 +5,16 @@ gcloud dataproc clusters create my-cluster \
   --num-workers=2 \
   --worker-machine-type=n1-standard-2
 
+
+PROJECT_ID=data-engineering-488013
+SA=sql-bot-sa@$PROJECT_ID.iam.gserviceaccount.com
+
+gcloud dataproc batches submit pyspark main.py \
+  --project=$PROJECT_ID \
+  --region=us-central1 \
+  --service-account=$SA \
+  --jars=gs://spark-lib/bigquery/spark-bigquery-latest.jar
+
 gcloud dataproc clusters create my-cluster \
   --region=us-central1 \
   --num-workers=2 \
