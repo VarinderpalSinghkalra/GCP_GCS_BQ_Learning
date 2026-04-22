@@ -5,6 +5,13 @@ gcloud dataproc clusters create my-cluster \
   --num-workers=2 \
   --worker-machine-type=n1-standard-2
 
+gcloud dataproc clusters create my-cluster \
+  --region=us-central1 \
+  --num-workers=2 \
+  --worker-machine-type=n1-standard-2 \
+  --worker-boot-disk-size=50GB \
+  --master-boot-disk-size=50GB
+
 
 gcloud dataproc jobs submit pyspark main.py \
   --cluster=my-cluster \
