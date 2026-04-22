@@ -45,3 +45,29 @@ gcloud dataproc jobs submit pyspark main.py \
   --cluster=my-cluster \
   --region=us-central1 \
   --jars=gs://spark-lib/bigquery/spark-bigquery-latest.jar
+
+
+
+
+gcloud dataproc clusters create my-cluster \
+  --project=data-engineering-488013 \
+  --region=us-east1 \
+  --single-node \
+  --master-machine-type=n1-standard-2 \
+  --master-boot-disk-size=50GB \
+  --service-account=$SA
+
+
+gcloud dataproc jobs submit pyspark main.py \
+  --cluster=my-cluster \
+  --region=us-east1 \
+  --jars=gs://spark-lib/bigquery/spark-bigquery-latest.jar
+
+
+
+
+
+
+
+
+
