@@ -1,10 +1,15 @@
-
 cluster creation :- 
 
 gcloud dataproc clusters create my-cluster \
   --region=us-central1 \
   --num-workers=2 \
   --worker-machine-type=n1-standard-2
+
+
+gcloud dataproc jobs submit pyspark main.py \
+  --cluster=my-cluster \
+  --region=us-central1 \
+  --jars=gs://spark-lib/bigquery/spark-bigquery-latest.jar
 
 
 
