@@ -180,6 +180,11 @@ gcloud pubsub topics create ordered-topic \
 
 ⸻
 
+Ordering subscription
+
+gcloud pubsub subscriptions create ordered-sub \
+    --topic=ordered-topic
+
 Publish Ordered Message
 
 gcloud pubsub topics publish ordered-topic \
