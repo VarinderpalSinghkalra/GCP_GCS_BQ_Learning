@@ -1,0 +1,100 @@
+from airflow import DAG
+from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.providers.google.cloud.hooks.gcs import GCSHook
+from airflow.operators.python import PythonOperator
+from airflow.models import Variable
+from datetime import datetime
+import pandas as pd
+import os
+
+# =========================================================
+# Airflow Variables
+# =========================================================
+
+GCP_BUCKET_NAME = Variable.get("gcs_bucket_name")
+GCS_OBJECT_NAME = Variable.get("gcs_object_name")
+LOCAL_FILE_PATH = Variable.get("local_file_path")
+
+POSTGRES_CONN_ID = Variable.get("postgres_conn_id")
+
+# =========================================================
+# Default Arguments
+# =========================================================
+
+default_args = {
+    "owner": "varinder",
+    "depends_on_past": False,
+    "start_date": datetime(2025, 1, 1),
+    "retries": 2
+}
+
+# =========================================================
+# DAG Definition
+# =========================================================
+
+with DAG(
+    dag_id="postgres_to_gcs_pipeline",
+    default_args=default_args,
+    schedule_interval="@daily",
+    catchup=False,
+    tags=["postgres", "gcs", "etl"]
+) as dag:
+
+    # =====================================================
+    # Extract Data from PostgreSQL
+    # =====================================================
+
+    def extract_postgres_data():
+
+        postgres_hook = PostgresHook(
+            postgres_conn_id=POSTGRES_CONN_ID
+        )
+
+        query = """
+        SELECT *
+        FROM employee;
+        """
+
+        connection = postgres_hook.get_conn()
+
+        df = pd.read_sql(query, connection)
+
+        df.to_csv(LOCAL_FILE_PATH, index=False)
+
+        print(f"Data extracted successfully: {LOCAL_FILE_PATH}")
+
+    # =====================================================
+    # Upload File to GCS
+    # =====================================================
+
+    def upload_to_gcs():
+
+        gcs_hook = GCSHook()
+
+        gcs_hook.upload(
+            bucket_name=GCP_BUCKET_NAME,
+            object_name=GCS_OBJECT_NAME,
+            filename=LOCAL_FILE_PATH
+        )
+
+        print(f"File uploaded to GCS bucket: {GCP_BUCKET_NAME}")
+
+    # =====================================================
+    # Task Definitions
+    # =====================================================
+
+    extract_task = PythonOperator(
+        task_id="extract_postgres_data",
+        python_callable=extract_postgres_data
+    )
+
+    upload_task = PythonOperator(
+        task_id="upload_file_to_gcs",
+        python_callable=upload_to_gcs
+    )
+
+    # =====================================================
+    # Task Dependency
+    # =====================================================
+
+    extract_task >> upload_task
