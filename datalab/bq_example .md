@@ -1,3 +1,6 @@
+!pip install db-dtypes     >>>> install this first
+
+
 from google.cloud import bigquery
 
 client = bigquery.Client()
