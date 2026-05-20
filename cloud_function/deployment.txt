@@ -1,0 +1,9 @@
+gcloud functions deploy hello-world \
+  --gen2 \
+  --runtime python311 \
+  --region us-central1 \
+  --source . \
+  --entry-point hello_world \
+  --trigger-http \
+  --allow-unauthenticated \
+  --service-account sql-bot@PROJECT_ID.iam.gserviceaccount.com
