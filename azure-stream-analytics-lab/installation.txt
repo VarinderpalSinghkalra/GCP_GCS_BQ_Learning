@@ -1,0 +1,9 @@
+choco install terraform
+
+terraform version
+
+az login
+
+az account show
+
+az account set --subscription "<subscription-id>"
