@@ -7,3 +7,28 @@ terraform fmt
 terraform plan
 
 terraform apply -auto-approve
+
+az group show \
+--name GL-EVENT-PROC
+
+az eventhubs eventhub list \
+--resource-group GL-EVENT-PROC \
+--namespace-name gleventproc12345
+
+az storage container list \
+--account-name gleventstorage12345 \
+--auth-mode login
+
+az stream-analytics job start \
+--name telecomfakecallsjob \
+--resource-group GL-EVENT-PROC \
+--output-start-mode JobStartTime
+
+az stream-analytics job show \
+--name telecomfakecallsjob \
+--resource-group GL-EVENT-PROC \
+--query jobState
+
+
+terraform destroy -auto-approve
+
