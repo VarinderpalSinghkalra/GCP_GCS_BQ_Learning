@@ -19,6 +19,12 @@ az eventhubs namespace authorization-rule keys list \
 --name RootManageSharedAccessKey
 
 
+az storage blob list \
+--account-name gleventstorage12345 \
+--container-name telecomoutputstorage \
+--auth-mode login
+
+
 
 az group show \
 --name GL-EVENT-PROC
