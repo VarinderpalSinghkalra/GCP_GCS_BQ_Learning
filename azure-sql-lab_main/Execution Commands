@@ -1,0 +1,48 @@
+az login
+
+az account show
+
+terraform init
+
+terraform fmt
+
+terraform validate
+
+terraform plan
+
+terraform apply -auto-approve
+
+Verify SQL Connection
+
+After deployment:
+
+terraform output sql_server_fqdn
+
+Connect from VM using:
+
+sudo apt update
+
+sudo apt install curl apt-transport-https software-properties-common gnupg2 -y
+
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+
+curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+
+sudo apt update
+
+sudo ACCEPT_EULA=Y apt install mssql-tools18 unixodbc-dev -y
+
+Then:
+
+/opt/mssql-tools18/bin/sqlcmd \
+-S glsqlserver01terraform.database.windows.net \
+-U mbadmin \
+-P 'Password@123456!' \
+-d SampleDB
+
+Run:
+SELECT @@VERSION;
+GO
+
+SELECT TOP 5 * FROM SalesLT.Customer;
+GO
