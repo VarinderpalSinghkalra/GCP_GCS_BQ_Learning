@@ -1,0 +1,6 @@
+resource "azurerm_mssql_database" "sqldb" {
+  name      = "SampleDB"
+  server_id = azurerm_mssql_server.sqlserver.id
+
+  sku_name = "Basic"
+}
