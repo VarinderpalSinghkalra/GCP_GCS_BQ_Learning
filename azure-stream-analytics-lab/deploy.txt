@@ -8,6 +8,8 @@ terraform plan
 
 terraform apply -auto-approve
 
+powershell .\start-job.ps1
+
 az group show \
 --name GL-EVENT-PROC
 
