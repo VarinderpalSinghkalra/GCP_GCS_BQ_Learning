@@ -10,6 +10,8 @@ terraform apply -auto-approve
 
 powershell .\start-job.ps1
 
+pip install azure-eventhub
+
 az group show \
 --name GL-EVENT-PROC
 
