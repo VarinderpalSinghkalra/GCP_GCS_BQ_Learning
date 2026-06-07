@@ -12,6 +12,14 @@ powershell .\start-job.ps1
 
 pip install azure-eventhub
 
+
+az eventhubs namespace authorization-rule keys list \
+--resource-group GL-EVENT-PROC \
+--namespace-name gleventproc12345 \
+--name RootManageSharedAccessKey
+
+
+
 az group show \
 --name GL-EVENT-PROC
 
