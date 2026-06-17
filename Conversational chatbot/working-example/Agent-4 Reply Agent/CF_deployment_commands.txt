@@ -31,3 +31,4 @@ gcloud functions deploy get_issue_status \
   --entry-point get_issue_status \
   --timeout 540s
 
+gcloud functions describe bq_spendagent --region us-central1 --gen2 --format="value(serviceConfig.uri)"
