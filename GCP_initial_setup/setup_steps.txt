@@ -1,3 +1,2 @@
 chmod +x setup_gcp_project.sh
-
-./setup_gcp_project.sh -c ./config.env
+./setup_gcp_project.sh config.env
