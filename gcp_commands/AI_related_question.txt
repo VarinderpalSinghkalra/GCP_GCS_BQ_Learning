@@ -1,0 +1,279 @@
+Question 1 – BigQuery ML vs Vertex AI
+
+Your analysts want to build a sales forecasting model using SQL without exporting data.
+
+A. Vertex AI Workbench
+B. BigQuery ML ✅
+C. Dataflow
+D. Dataproc
+
+Answer: B
+
+Why?
+BigQuery ML lets analysts create and use ML models directly with SQL, avoiding data movement.
+
+⸻
+
+Question 2 – Online Prediction
+
+A fraud detection application requires predictions within milliseconds.
+
+A. Batch Prediction
+B. Vertex AI Endpoint ✅
+C. BigQuery ML
+D. Cloud Storage
+
+Answer: B
+
+Why?
+Vertex AI Endpoints provide low-latency online inference.
+
+⸻
+
+Question 3 – Batch Prediction
+
+Every night, your company predicts customer churn for 15 million customers.
+
+A. Vertex AI Batch Prediction ✅
+B. Cloud Run
+C. Compute Engine
+D. Pub/Sub
+
+Answer: A
+
+Why?
+Large scheduled prediction jobs are best handled with batch prediction.
+
+⸻
+
+Question 4 – Data Preparation
+
+Data scientists complain that model accuracy is poor because customer records contain duplicate and missing values.
+
+Which step should be completed first?
+
+A. Train a larger model
+B. Clean and validate the data ✅
+C. Increase CPU
+D. Add more storage
+
+Answer: B
+
+Why?
+Poor-quality data leads to poor-quality models.
+
+⸻
+
+Question 5 – Embeddings
+
+You need to search documents based on meaning rather than exact words.
+
+A. Cloud SQL
+B. Embeddings + Vector Search ✅
+C. Cloud Storage
+D. Pub/Sub
+
+Answer: B
+
+⸻
+
+Question 6 – RAG
+
+Your chatbot must answer questions using internal company documentation.
+
+A. Fine-tune Gemini
+B. Retrieval-Augmented Generation (RAG) ✅
+C. Bigtable
+D. Memorize documents
+
+Answer: B
+
+⸻
+
+Question 7 – Fine-tuning
+
+When should you fine-tune a foundation model?
+
+A. For every application
+B. Only when prompting isn’t sufficient and domain-specific behavior is needed ✅
+C. Never
+D. Only for images
+
+Answer: B
+
+⸻
+
+Question 8 – Feature Store
+
+Multiple teams need the same engineered customer features.
+
+A. Cloud SQL
+B. Vertex AI Feature Store ✅
+C. Cloud Storage
+D. Pub/Sub
+
+Answer: B
+
+⸻
+
+Question 9 – AutoML
+
+A business team has little ML expertise but wants to build an image classifier.
+
+A. AutoML ✅
+B. TensorFlow from scratch
+C. Compute Engine
+D. Dataproc
+
+Answer: A
+
+⸻
+
+Question 10 – Explainability
+
+A bank must explain why loan applications were rejected.
+
+A. Larger GPUs
+B. Explainable AI features in Vertex AI ✅
+C. More RAM
+D. Cloud Composer
+
+Answer: B
+
+⸻
+
+Question 11 – Responsible AI
+
+Which practice helps reduce bias in an AI model?
+
+A. Train on more data without review
+B. Evaluate the model across diverse datasets and monitor fairness ✅
+C. Use only one feature
+D. Increase temperature
+
+Answer: B
+
+⸻
+
+Question 12 – Hallucination
+
+What is an AI hallucination?
+
+A. Faster inference
+B. A confident but incorrect or unsupported response ✅
+C. Better embeddings
+D. A larger context window
+
+Answer: B
+
+⸻
+
+Question 13 – Temperature
+
+What does increasing the temperature parameter generally do?
+
+A. Makes responses more deterministic
+B. Makes responses more creative and varied ✅
+C. Improves model accuracy
+D. Reduces latency
+
+Answer: B
+
+⸻
+
+Question 14 – Prompt Engineering
+
+You need to improve an LLM’s responses without retraining the model.
+
+A. Prompt engineering ✅
+B. Retrain from scratch
+C. Increase storage
+D. Use Cloud SQL
+
+Answer: A
+
+⸻
+
+Question 15 – Data Pipeline for AI
+
+Streaming IoT data must be transformed and used for predictions.
+
+A. Pub/Sub → Dataflow → Vertex AI Endpoint ✅
+B. Cloud Storage → Bigtable
+C. Cloud SQL → Compute Engine
+D. Dataproc → Cloud Functions
+
+Answer: A
+
+⸻
+
+Question 16 – Model Monitoring
+
+Model accuracy drops after several months because customer behavior has changed.
+
+This is called:
+
+A. Data drift / concept drift ✅
+B. Cloud drift
+C. SQL drift
+D. Storage drift
+
+Answer: A
+
+⸻
+
+Question 17 – Gemini
+
+Which service provides access to Gemini foundation models on Google Cloud?
+
+A. Vertex AI ✅
+B. Bigtable
+C. Pub/Sub
+D. Cloud Storage
+
+Answer: A
+
+⸻
+
+Question 18 – BigQuery Vector Search
+
+When should BigQuery vector search be considered?
+
+A. Semantic similarity search over data stored in BigQuery ✅
+B. Transaction processing
+C. Database backups
+D. IAM management
+
+Answer: A
+
+⸻
+
+Question 19 – Choosing an ML Service
+
+Your organization wants to train custom models, manage experiments, deploy endpoints, and monitor predictions.
+
+A. Vertex AI ✅
+B. Cloud SQL
+C. Pub/Sub
+D. Cloud Functions
+
+Answer: A
+
+⸻
+
+Question 20 – End-to-End AI Architecture
+
+Which architecture best supports document question answering?
+
+1. Cloud Storage
+2. Document parsing and chunking
+3. Embedding generation
+4. Vector index
+5. Gemini with RAG
+
+A. This complete pipeline ✅
+B. Cloud SQL only
+C. Bigtable only
+D. Compute Engine only
+
+Answer: A
