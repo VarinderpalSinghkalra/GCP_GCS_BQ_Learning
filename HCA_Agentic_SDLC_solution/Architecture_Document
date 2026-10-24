@@ -1,0 +1,567 @@
+Agentic SDLC Automation Platform for GCP Lakehouse
+
+Solution Architecture Document
+
+Document Attribute	Details
+Solution Name	Agentic Lakehouse Engineering Platform
+Cloud Platform	Google Cloud Platform (GCP)
+Architecture Pattern	Agentic AI, Metadata-Driven Engineering, Automated CI/CD
+Data Architecture	Bronze → Silver → Gold
+Ingestion Framework	Apache Beam on Dataflow Flex Templates
+Orchestration	Cloud Composer (Apache Airflow)
+Data Storage and Processing	BigQuery and Iceberg-compatible storage
+AI Framework	Google Agent Development Kit (ADK) with Vertex AI and Gemini
+Infrastructure Automation	Terraform
+Document Version	1.0
+
+⸻
+
+1. Executive Summary
+
+The Agentic SDLC Automation Platform is an AI-assisted engineering solution designed to automate the end-to-end development lifecycle of data pipelines on Google Cloud Platform.
+
+The platform uses specialized AI agents to interpret mapping documents, generate database DDLs, create and configure tables, develop Dataflow pipelines, package Dataflow Flex Templates, generate Airflow DAGs, implement Silver-layer SQL transformations, execute automated validations, and prepare controlled deployments.
+
+The solution supports enterprise data ingestion from SQL Server, Oracle, REST APIs, files, and Confluent Kafka. Data is ingested into the Bronze layer using Dataflow, with Cloud Composer coordinating pipeline execution and dependencies. Silver-layer transformations follow the approved mapping sheet and are executed through Airflow DAGs. The Gold layer contains business-ready data for downstream analytics and reporting.
+
+A centralized engineering workbench provides visibility into agent activities, generated artifacts, test results, deployment approvals, and operational health.
+
+The architecture combines AI-assisted development with deterministic execution, automated testing, infrastructure as code, controlled CI/CD, and enterprise security.
+
+Primary objective: Transform mapping-driven data engineering into a standardized, repeatable, and governed automated lifecycle—from requirements to production deployment.
+
+2. Business and Technical Objectives
+
+* Automate DDL generation and table creation.
+* Generate Dataflow batch and streaming pipelines using standardized templates.
+* Automate Dataflow Flex Template packaging, publishing, and version management.
+* Generate and maintain Cloud Composer Airflow DAGs.
+* Generate Silver SQL from approved mapping sheets.
+* Automate unit testing, integration testing, schema validation, and data reconciliation.
+* Standardize Git workflows, code reviews, CI/CD, and environment promotion.
+* Provide AI-assisted failure analysis and controlled remediation proposals.
+* Improve engineering productivity, consistency, traceability, and operational visibility.
+* Enforce security, least-privilege access, governance, and human approval controls.
+
+3. High-Level Solution Architecture
+
+flowchart TB
+    subgraph SOURCES["01 | Source Systems"]
+        SQL["SQL Server"]
+        ORA["Oracle"]
+        API["REST APIs"]
+        FILES["Files"]
+        KAFKA["Confluent Kafka"]
+    end
+    subgraph ENGINEERING["02 | Agentic Engineering Platform"]
+        UI["Engineering Workbench"]
+        APIAPP["Backend API - Cloud Run"]
+        WF["Workflow Manager"]
+        SUP["Supervisor Agent - ADK"]
+        MAP["Mapping and Schema Agent"]
+        DDL["DDL and Table Agent"]
+        DFAG["Dataflow Pipeline Agent"]
+        FLEX["Flex Template Agent"]
+        SQLAG["Silver SQL Agent"]
+        DAGAG["Airflow DAG Agent"]
+        TEST["Testing and Reconciliation Agent"]
+        REL["Release Agent"]
+        OPS["Monitoring and RCA Agent"]
+    end
+    subgraph ARTIFACTS["03 | Metadata and Source Control"]
+        SPEC["Versioned Pipeline Specification"]
+        GIT["Git Repository"]
+        GCS["Cloud Storage - Staging and Specifications"]
+    end
+    subgraph DELIVERY["04 | CI/CD and Artifact Management"]
+        BUILD["Cloud Build"]
+        AR["Artifact Registry"]
+        PR["Pull Requests and Approvals"]
+        TF["Terraform"]
+    end
+    subgraph EXECUTION["05 | Orchestration and Processing"]
+        COMP["Cloud Composer / Airflow"]
+        LAUNCH["Flex Template Launch"]
+        DF["Dataflow Batch and Streaming Jobs"]
+    end
+    subgraph LAKEHOUSE["06 | GCP Lakehouse"]
+        BRONZE["Bronze - Raw Iceberg Tables"]
+        SILVER["Silver - Mapping-Driven SQL"]
+        GOLD["Gold - Business Data Models"]
+        BQ["BigQuery SQL Engine"]
+    end
+    subgraph CONTROLS["07 | Security and Governance"]
+        IAM["Cloud IAM and Service Accounts"]
+        SM["Secret Manager"]
+        AUDIT["Cloud Audit Logs"]
+        GOV["Dataplex / Catalog Capabilities"]
+    end
+    subgraph OBS["08 | Observability"]
+        LOG["Cloud Logging"]
+        MON["Cloud Monitoring"]
+        ALERT["Alerting and Incident Management"]
+        DASH["Operations Dashboard"]
+    end
+    SQL --> DF
+    ORA --> DF
+    API --> DF
+    FILES --> DF
+    KAFKA --> DF
+    UI --> APIAPP --> WF --> SUP
+    SUP --> MAP
+    SUP --> DDL
+    SUP --> DFAG
+    SUP --> FLEX
+    SUP --> SQLAG
+    SUP --> DAGAG
+    SUP --> TEST
+    SUP --> REL
+    SUP --> OPS
+    MAP --> SPEC
+    SPEC --> GIT
+    DDL --> GIT
+    DFAG --> GIT
+    FLEX --> GIT
+    SQLAG --> GIT
+    DAGAG --> GIT
+    GIT --> BUILD
+    TF --> BUILD
+    BUILD --> AR
+    BUILD --> PR
+    PR --> COMP
+    AR --> LAUNCH
+    COMP --> LAUNCH
+    LAUNCH --> DF
+    DF --> BRONZE
+    BRONZE --> BQ
+    COMP --> BQ
+    BQ --> SILVER
+    SILVER --> BQ
+    BQ --> GOLD
+    IAM -.-> APIAPP
+    IAM -.-> COMP
+    IAM -.-> DF
+    SM -.-> APIAPP
+    SM -.-> DF
+    AUDIT -.-> OBS
+    GOV -.-> LAKEHOUSE
+    APIAPP --> LOG
+    BUILD --> LOG
+    COMP --> LOG
+    DF --> LOG
+    LOG --> MON
+    MON --> ALERT
+    MON --> DASH
+    OPS --> DASH
+
+Architecture note: This diagram shows logical components and integrations. Actual deployment topology, connector support, Iceberg read/write capabilities, and SQL execution paths must be validated against the selected GCP services and catalog implementation.
+
+4. Core Architecture Components
+
+4.1 Agentic Engineering Workbench
+
+Purpose: Provide a centralized interface for managing the complete data engineering lifecycle.
+
+Technology stack
+
+* React and TypeScript for the frontend.
+* Python API hosted on Cloud Run.
+* Google ADK for agent implementation and orchestration.
+* Vertex AI and Gemini for model inference.
+* A durable workflow-state store, such as Cloud SQL or Firestore, selected according to transactional and audit requirements.
+* Git integration for source control and code review.
+
+Key capabilities
+
+* Upload and inspect mapping sheets.
+* Initiate pipeline generation workflows.
+* Review DDL, SQL, DAGs, and Dataflow pipeline code.
+* View agent execution status and generated artifacts.
+* Inspect validation results and reconciliation reports.
+* Submit changes for approval.
+* Monitor deployments and production execution.
+
+4.2 Data Ingestion Layer
+
+Services: Dataflow, Cloud Composer, Cloud Storage, Secret Manager, and Cloud Logging.
+
+The ingestion layer extracts data from relational databases, APIs, files, and Kafka streams and writes it to the Bronze layer.
+
+Responsibilities include:
+
+* Source connectivity and authentication.
+* Batch extraction and streaming ingestion.
+* Incremental loading and historical backfills.
+* Schema validation and controlled schema evolution.
+* Retry handling and error reporting.
+* Ingestion audit metadata and record counts.
+
+SQL Server and Oracle ingestion mechanisms must be selected based on source configuration, network connectivity, volume, and CDC requirements.
+
+4.3 Bronze Layer — Raw Lakehouse
+
+Technology: BigQuery Iceberg tables, using the approved catalog and write integration.
+
+Responsibilities:
+
+* Preserve source data and ingestion metadata.
+* Maintain traceability to source systems and ingestion runs.
+* Support downstream Silver transformations.
+* Enable controlled replay and historical processing.
+* Capture schema changes and ingestion audit information.
+
+The implementation must explicitly select between BigQuery-managed Iceberg tables and a separately managed Iceberg catalog/runtime. Their supported write paths and SQL operations must not be assumed to be interchangeable.
+
+4.4 Silver Layer — Mapping-Driven Transformation
+
+Technology: Approved SQL execution engine, Cloud Composer, and the Silver SQL Agent.
+
+The Silver layer follows a metadata-driven development model:
+
+Mapping Sheet → Pipeline Specification → SQL Generation → SQL Validation → Airflow DAG → Execution → Data Reconciliation
+
+Responsibilities:
+
+* Extract source and target mappings.
+* Generate or update transformation SQL.
+* Validate column mappings, data types, joins, filters, and business rules.
+* Implement approved full-load or incremental-load patterns.
+* Support SCD Type 1, SCD Type 2, and CDC patterns where specified.
+* Generate data-quality and reconciliation queries.
+* Create or update the corresponding Airflow DAG tasks.
+
+The mapping document remains the source of transformation requirements. AI-generated SQL must be validated against the approved mapping, the actual target table format, and supported SQL capabilities.
+
+4.5 Gold Layer — Business Data Products
+
+Technology: BigQuery and approved downstream analytical services.
+
+Responsibilities:
+
+* Execute business transformations and aggregations.
+* Publish reporting-ready datasets.
+* Enforce business data-quality requirements.
+* Support analytics, dashboards, and downstream consumers.
+* Maintain lineage and controlled access to business data.
+
+5. Agent Responsibilities and Generated Artifacts
+
+Agent	Primary Responsibility	Generated Artifacts
+Supervisor Agent	Coordinate the end-to-end workflow	Workflow state and task assignments
+Mapping Agent	Interpret mapping documents	Versioned pipeline specification
+Schema Agent	Compare source and target structures	Schema validation and change report
+DDL and Table Agent	Create database definitions	DDL scripts and table configurations
+Dataflow Pipeline Agent	Generate ingestion pipeline code	Apache Beam source, configuration, and tests
+Flex Template Agent	Package and configure Dataflow jobs	Dockerfile, template specification, launch parameters
+Silver SQL Agent	Generate mapping-driven SQL	SQL scripts, DML, and validation queries
+Airflow DAG Agent	Generate orchestration code	DAG files, task dependencies, and runtime configuration
+Testing Agent	Validate generated artifacts	Unit tests, integration tests, and reconciliation results
+Release Agent	Prepare controlled deployments	Release manifests and deployment evidence
+Monitoring Agent	Diagnose failures and report health	Alerts, incident analysis, and remediation proposals
+
+Agents should use approved code templates and engineering standards. Generated artifacts must be reviewable, versioned, testable, and reproducible.
+
+6. Automated Artifact Generation Lifecycle
+
+Step 1 — Mapping Intake
+
+The engineer uploads or selects the approved mapping sheet.
+
+The Mapping Agent extracts:
+
+* Source system, schema, and table.
+* Target layer, dataset, and table.
+* Column mappings and data types.
+* Transformation expressions and business rules.
+* Primary keys and merge conditions.
+* Incremental-load and SCD strategies.
+* Data-quality rules and orchestration dependencies.
+
+The output is a versioned pipeline specification validated against a formal schema.
+
+Step 2 — DDL and Table Generation
+
+The DDL and Table Agent generates:
+
+* Dataset and table creation scripts.
+* Bronze Iceberg table definitions and required configuration.
+* Silver and Gold table definitions.
+* Partitioning and clustering configurations where supported.
+* Audit and reconciliation table definitions.
+* Schema migration scripts where needed.
+
+Existing objects must be inspected before changes are proposed. Destructive DDL and production schema migrations require explicit approval.
+
+Step 3 — Dataflow Pipeline Generation
+
+The Dataflow Pipeline Agent generates:
+
+* Apache Beam pipeline source.
+* Source and sink configurations.
+* Batch or streaming execution parameters.
+* Incremental extraction and error-handling logic.
+* Logging, metrics, and audit metadata.
+* Unit and integration tests.
+
+Step 4 — Flex Template Build and Publication
+
+The Flex Template Agent coordinates the following lifecycle:
+
+1. Validate pipeline code and dependencies.
+2. Build the container image through Cloud Build.
+3. Publish the versioned image to Artifact Registry.
+4. Generate and publish the Flex Template specification to the approved Cloud Storage location.
+5. Validate template parameters and required permissions.
+6. Launch the template in development or QA.
+7. Record the image digest, template version, build ID, and job ID.
+8. Promote the approved version through the release pipeline.
+
+The Flex Template container image and template specification must be versioned together. Airflow should reference an approved immutable version rather than an uncontrolled latest tag.
+
+Step 5 — Silver SQL and DAG Generation
+
+The Silver SQL Agent generates or updates SQL using the mapping sheet and approved SQL templates.
+
+The Airflow DAG Agent generates:
+
+* DAG Python source.
+* Dataflow Flex Template launch tasks.
+* Silver SQL execution tasks.
+* Dependencies and scheduling rules.
+* Retries, timeouts, and failure handling.
+* Backfill parameters and execution metadata.
+
+DAG validation must confirm that the generated code imports successfully and uses the correct operators, configuration, and permissions.
+
+Step 6 — Testing and Reconciliation
+
+The Testing Agent validates:
+
+* SQL syntax and mapping completeness.
+* Table schemas and target compatibility.
+* Dataflow pipeline unit tests.
+* Flex Template build and launch.
+* Airflow DAG structure and dependencies.
+* Record counts and source-to-target reconciliation.
+* Null constraints, key uniqueness, and business rules.
+* Security scans and infrastructure validation.
+
+Failed checks return actionable findings to the engineer or the responsible agent. Automated repair attempts must be bounded and revalidated.
+
+Step 7 — Controlled Release
+
+The Release Agent assembles the approved changes into a release package.
+
+The package includes:
+
+* DDL and migration scripts.
+* Dataflow source and Flex Template references.
+* Airflow DAGs.
+* Silver SQL.
+* Test and reconciliation evidence.
+* Environment-specific configuration.
+* Terraform changes where required.
+* Deployment and rollback instructions.
+
+Production deployment occurs only after the required human approvals and CI/CD gates succeed.
+
+7. GCP Service Inventory
+
+Service	Architectural Role
+Vertex AI	Model inference and approved AI platform capabilities
+Gemini	Reasoning, mapping interpretation, and code-generation assistance
+Google ADK	Agent development and orchestration
+Cloud Run	Host the backend API and workflow services
+Cloud Composer	Orchestrate data pipelines and dependencies
+Dataflow	Execute batch and streaming pipelines
+Dataflow Flex Templates	Package and launch reusable Dataflow jobs
+Artifact Registry	Store container images and versioned artifacts
+Cloud Storage	Landing, staging, template specifications, and approved artifacts
+BigQuery	Analytical storage and supported SQL execution
+Cloud Build	Build, test, scan, and deploy approved changes
+Terraform	Provision and manage infrastructure
+Secret Manager	Secure storage of credentials and sensitive configuration
+Cloud IAM	Authentication, authorization, and least-privilege access
+Cloud Logging	Centralized operational logs
+Cloud Monitoring	Metrics, dashboards, and alerting
+Cloud Audit Logs	Administrative and resource-access audit records
+Dataplex / Catalog capabilities	Metadata discovery, governance, and lineage where configured
+Pub/Sub	Optional asynchronous event and workflow messaging
+Cloud SQL / Firestore	Optional durable workflow state and metadata storage
+
+Additional networking and security services, such as VPC, private connectivity, Cloud KMS, and organization policy controls, should be included according to enterprise requirements.
+
+8. CI/CD and Environment Promotion
+
+The recommended release lifecycle is:
+
+flowchart LR
+    A["Agent-Generated Changes"] --> B["Git Branch"]
+    B --> C["Static Analysis and Unit Tests"]
+    C --> D["Cloud Build"]
+    D --> E["Build Container and Validate Artifacts"]
+    E --> F["Pull Request"]
+    F --> G["Human Review"]
+    G --> H["Development / QA Deployment"]
+    H --> I["Integration and Reconciliation Tests"]
+    I --> J["Production Approval"]
+    J --> K["Promote Approved Artifacts"]
+    K --> L["Production Execution"]
+    L --> M["Monitoring and Audit"]
+
+Required controls
+
+* Protected Git branches and mandatory reviews.
+* Separate identities for agent execution, CI/CD, and production deployment.
+* Versioned artifacts and reproducible builds.
+* Environment-specific configuration.
+* Security and dependency scanning.
+* Explicit production approval.
+* Rollback procedures and deployment evidence.
+
+9. Security and Governance Framework
+
+Identity and access
+
+* Apply least-privilege IAM permissions.
+* Use dedicated service accounts for each execution boundary.
+* Separate development, QA, and production environments.
+* Restrict service-account impersonation and privileged operations.
+
+Agent governance
+
+* Enforce tool allowlists and backend authorization.
+* Treat mapping documents and external content as untrusted input.
+* Validate all generated SQL, code, DDL, and infrastructure changes.
+* Prevent agents from granting permissions, approving their own changes, or bypassing deployment gates.
+* Require human review for destructive operations and business-rule changes.
+
+Data protection
+
+* Apply dataset, table, column, and row-level controls as appropriate.
+* Store secrets in Secret Manager.
+* Avoid sending PHI, PII, credentials, or unnecessary source records to model prompts.
+* Use appropriately protected test data.
+* Enforce approved data-retention and audit policies.
+
+Auditability
+
+Each workflow should capture:
+
+* Requesting identity and initiation event.
+* Mapping version and specification hash.
+* Generated artifact references and Git commit IDs.
+* Agent task history and tool actions.
+* Test results and validation evidence.
+* Approval records and deployment identifiers.
+* Dataflow job IDs, Airflow run IDs, and final execution status.
+
+10. Operational Monitoring
+
+The platform should provide centralized visibility into engineering workflows and runtime data processing.
+
+Monitoring Domain	Key Indicators
+Agent workflows	Task status, duration, failures, and repair attempts
+Dataflow	Job state, throughput, worker errors, and processing latency
+Flex Templates	Build status, image version, launch success, and runtime parameters
+Airflow	DAG success, task failures, retries, and dependency delays
+Bronze	Ingestion completeness, schema changes, and data freshness
+Silver	SQL failures, merge results, row counts, and reconciliation
+Gold	Business data quality and freshness
+CI/CD	Build failures, security findings, approvals, and deployment status
+Security	Access denials, policy violations, and privileged actions
+
+Alerts should use agreed thresholds and operational service-level objectives. The Monitoring Agent may diagnose failures and propose corrective changes; production remediation must remain subject to the configured authorization policy.
+
+11. Recommended Git Repository Structure
+
+agentic-lakehouse-platform/
+├── README.md
+├── frontend/
+│   └── src/
+├── backend/
+│   ├── api/
+│   ├── workflow_manager/
+│   ├── policy_engine/
+│   └── audit_service/
+├── agents/
+│   ├── supervisor/
+│   ├── mapping/
+│   ├── schema/
+│   ├── ddl_table/
+│   ├── dataflow/
+│   ├── flex_template/
+│   ├── silver_sql/
+│   ├── airflow_dag/
+│   ├── testing/
+│   ├── release/
+│   └── monitoring/
+├── contracts/
+│   ├── mapping.schema.json
+│   └── pipeline-spec.schema.json
+├── templates/
+│   ├── ddl/
+│   ├── dataflow/
+│   ├── flex_templates/
+│   ├── airflow/
+│   ├── silver_sql/
+│   └── tests/
+├── infrastructure/
+│   └── terraform/
+├── cicd/
+│   └── cloudbuild.yaml
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── data_quality/
+│   └── reconciliation/
+├── dashboards/
+└── docs/
+    ├── architecture.md
+    ├── security.md
+    ├── deployment.md
+    └── runbooks/
+
+12. Implementation Roadmap
+
+Phase 1 — Platform Foundation
+
+Establish the repository, mapping specification, backend workflow manager, engineering workbench, agent runtime, and security boundaries.
+
+Phase 2 — DDL and Silver SQL Automation
+
+Generate DDL, table definitions, mapping-driven Silver SQL, and Airflow DAGs. Validate the complete workflow on a representative table.
+
+Phase 3 — Dataflow Flex Template Automation
+
+Generate Dataflow pipeline code, build container images, publish Flex Templates, and execute controlled development jobs.
+
+Phase 4 — End-to-End Integration
+
+Connect source ingestion to Bronze, Bronze to Silver, and Silver to Gold. Add integration tests, reconciliation, dependency management, and backfill support.
+
+Phase 5 — Enterprise Production Readiness
+
+Implement protected releases, production approval gates, immutable artifact promotion, centralized monitoring, audit reporting, and controlled remediation.
+
+13. Key Design Decisions Before Implementation
+
+The following must be finalized before production development:
+
+1. Iceberg catalog and the supported read/write integration.
+2. Source extraction strategy for SQL Server and Oracle.
+3. Approved mapping-sheet format and canonical pipeline specification.
+4. Dataflow Flex Template language, dependency management, and image lifecycle.
+5. Standard Airflow DAG templates and execution conventions.
+6. SQL execution engine and supported Silver-layer DDL/DML.
+7. Development, QA, and production project boundaries.
+8. Agent tool permissions, model configuration, and workflow-state persistence.
+9. Security, audit retention, data governance, and approval requirements.
+
+14. Target-State Outcome
+
+The platform will establish a standardized engineering lifecycle:
+
+Mapping Sheet → Metadata Specification → DDL and Table Creation → Dataflow Pipeline Generation → Flex Template Build and Publication → Airflow DAG Generation → Silver SQL Generation → Automated Testing → Git Review → CI/CD → Approved Deployment → Runtime Monitoring and Audit
+
+The outcome is a governed, scalable, and reusable automation platform that reduces manual development effort while preserving reliable data processing, security, reproducibility, and human control over production changes.
